@@ -1,0 +1,17 @@
+# Python / Backend
+backend/venv/
+backend/venv1/
+backend/__pycache__/
+backend/.env
+*.pyc
+
+# Java / Tomcat / Frontend
+AltoroJ/target/
+AltoroJ/.settings/
+AltoroJ/.classpath
+AltoroJ/.project
+*.class
+
+# OS Files
+.DS_Store
+Thumbs.db

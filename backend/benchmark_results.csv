@@ -1,0 +1,6 @@
+Test_ID,Category,Keywords_Found,Accuracy_%,Score
+TC-001,pre_filter_triage,6/7,85.7,3
+TC-002,pre_filter_triage,4/8,50.0,1
+TC-003,pre_filter_triage,3/7,42.9,0
+TC-004,pre_filter_triage,4/9,44.4,0
+TC-005,pre_filter_triage,6/8,75.0,1

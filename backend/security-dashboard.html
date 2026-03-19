@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Operations Centre — Altoro Mutual</title>
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <!-- Cytoscape.js for network topology -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.27.0/cytoscape.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0D1117;
+      --surface:   #161B22;
+      --surface2:  #1C2128;
+      --border:    #30363D;
+      --text:      #E6EDF3;
+      --muted:     #7D8590;
+      --accent:    #0EA5E9;
+      --green:     #3FB950;
+      --yellow:    #D29922;
+      --orange:    #DB6D28;
+      --red:       #F85149;
+      --critical:  #FF0000;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: "Segoe UI", sans-serif; height: 100vh; overflow: hidden; }
+
+    #soc-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      grid-template-rows: 80px 1fr 200px;
+      height: 100vh;
+      gap: 1px;
+      background: var(--border);
+    }
+    .panel {
+      background: var(--surface);
+      padding: 16px;
+      overflow: hidden;
+    }
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+
+    /* TOP BAR */
+    #top-bar { grid-column: 1 / 4; background: var(--surface2); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid var(--border); }
+    #top-bar h1 { font-size: 15px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+    #connection-status { font-size: 12px; color: var(--muted); }
+    #connection-status.connected { color: var(--green); }
+
+    /* THREAT SCORE */
+    #score-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #score-value { font-size: 72px; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+    #score-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+    #score-status { font-size: 13px; font-weight: 700; margin-top: 8px; letter-spacing: 1px; }
+
+    /* ALERT FEED */
+    #alert-feed { overflow-y: auto; height: calc(100% - 40px); }
+    .alert-card { padding: 10px 12px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid; font-size: 12px; cursor: pointer; transition: opacity 0.2s; }
+    .alert-card:hover { opacity: 0.8; }
+    .alert-card.critical { border-color: var(--critical); background: rgba(255,0,0,0.08); }
+    .alert-card.high     { border-color: var(--red);      background: rgba(248,81,73,0.08); }
+    .alert-card.medium   { border-color: var(--orange);   background: rgba(219,109,40,0.08); }
+    .alert-card.low      { border-color: var(--muted);    background: rgba(125,133,144,0.08); }
+    .alert-card .sev     { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+    .alert-card .msg     { color: var(--text); }
+    .alert-card .ts      { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+    /* TOPOLOGY */
+    #cy { width: 100%; height: calc(100% - 40px); border-radius: 4px; }
+
+    /* AI PANEL */
+    #ai-panel { overflow-y: auto; height: calc(100% - 40px); }
+    #attack-path { margin-bottom: 16px; }
+    .ap-step { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .ap-num  { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #000; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .ap-text { font-size: 12px; color: var(--text); }
+    .ap-tactic { font-size: 10px; color: var(--accent); margin-top: 2px; }
+    #approve-btn { width: 100%; padding: 14px; border: none; border-radius: 4px; background: var(--green); color: #000; font-size: 14px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; margin-top: 12px; display: none; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.6); } 50% { box-shadow: 0 0 0 12px rgba(63,185,80,0); } }
+
+    /* BOTTOM: SCAN CONTROLS + CHAT */
+    #scan-panel { grid-column: 1 / 3; display: flex; flex-direction: column; justify-content: space-between; }
+    #scan-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+    .scan-btn { padding: 8px 18px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface2); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .scan-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .scan-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #scan-status { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+    /* CHAT */
+    #chat-panel { display: flex; flex-direction: column; }
+    #chat-messages { flex: 1; overflow-y: auto; margin-bottom: 8px; font-size: 12px; }
+    .chat-msg { margin-bottom: 6px; padding: 6px 10px; border-radius: 4px; }
+    .chat-msg.user { background: var(--surface2); text-align: right; }
+    .chat-msg.ai   { background: rgba(14,165,233,0.1); border-left: 2px solid var(--accent); }
+    #chat-input-row { display: flex; gap: 6px; }
+    #chat-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 8px; color: var(--text); font-size: 12px; }
+    #chat-send  { padding: 8px 14px; background: var(--accent); border: none; border-radius: 4px; color: #000; font-weight: 700; cursor: pointer; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<div id="soc-grid">
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <h1>&#9632; Security Operations Centre</h1>
+    <div id="connection-status">CONNECTING...</div>
+    <div style="font-size:12px;color:var(--muted)">Altoro Mutual Bank</div>
+  </div>
+
+  <!-- ALERT FEED (left) -->
+  <div class="panel" style="grid-row: 2">
+    <div class="panel-title">Live Alerts</div>
+    <div id="alert-feed"></div>
+  </div>
+
+  <!-- NETWORK TOPOLOGY (centre) -->
+  <div class="panel" style="grid-row: 2">
+    <div class="panel-title">Network Topology</div>
+    <div id="cy"></div>
+  </div>
+
+  <!-- AI ANALYSIS (right) -->
+  <div class="panel" style="grid-row: 2">
+    <div class="panel-title">AI Analysis</div>
+    <div id="ai-panel">
+      <div id="threat-score-mini" style="margin-bottom:16px">
+        <div class="panel-title" style="margin-bottom:6px">Threat Score</div>
+        <div id="score-value" style="font-size:48px;font-weight:900">--</div>
+        <div id="score-status" style="font-size:12px">INITIALISING</div>
+      </div>
+      <div class="panel-title">Attack Path</div>
+      <div id="attack-path"><div style="color:var(--muted);font-size:12px">Waiting for threat data...</div></div>
+      <div class="panel-title" style="margin-top:12px">Playbook</div>
+      <div id="playbook-steps"><div style="color:var(--muted);font-size:12px">No active incident</div></div>
+      <button id="approve-btn" onclick="approveRemediation()">&#x2714; APPROVE REMEDIATION</button>
+    </div>
+  </div>
+
+  <!-- SCAN CONTROLS (bottom left + centre) -->
+  <div class="panel" id="scan-panel">
+    <div class="panel-title">Scan Controls</div>
+    <div id="scan-buttons">
+      <button class="scan-btn" onclick="triggerScan('network')">&#x25B6; Network Scan</button>
+      <button class="scan-btn" onclick="triggerScan('vuln')">&#x25B6; Vulnerability Scan</button>
+      <button class="scan-btn" onclick="triggerScan('web')">&#x25B6; Web Scan (ZAP)</button>
+      <button class="scan-btn" onclick="triggerScan('osint')">&#x25B6; OSINT Scan</button>
+      <button class="scan-btn" onclick="triggerScan('simulate')" style="border-color:var(--red);color:var(--red)">&#x26A0; Simulate Attack</button>
+    </div>
+    <div id="scan-status">Status: Idle — no scans running</div>
+  </div>
+
+  <!-- CHAT (bottom right) -->
+  <div class="panel" id="chat-panel">
+    <div class="panel-title">AI Security Chat</div>
+    <div id="chat-messages"></div>
+    <div id="chat-input-row">
+      <input id="chat-input" type="text" placeholder="Ask a security question..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button id="chat-send" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Configuration ──────────────────────────────────
+  const API_BASE = 'http://YOUR_EC2_2_IP:8000';
+  const WS_URL   = 'ws://YOUR_EC2_2_IP:8000/ws/events';
+  let ws = null;
+  let currentPlaybookId = null;
+  let threatScore = 0;
+  console.log('SOC Dashboard initialised');
+
+  // ── WebSocket ─────────────────────────────────────
+  function connectWS() {
+    const statusEl = document.getElementById('connection-status');
+    statusEl.textContent = 'CONNECTING...';
+    statusEl.className = '';
+    try {
+      ws = new WebSocket(WS_URL);
+      ws.onopen = function() {
+        statusEl.textContent = '● CONNECTED';
+        statusEl.className = 'connected';
+      };
+      ws.onmessage = function(evt) {
+        var data = JSON.parse(evt.data);
+        handleEvent(data);
+      };
+      ws.onclose = function() {
+        statusEl.textContent = '○ RECONNECTING...';
+        statusEl.className = '';
+        setTimeout(connectWS, 3000);
+      };
+      ws.onerror = function() { ws.close(); };
+    } catch(e) {
+      statusEl.textContent = '○ RECONNECTING...';
+      statusEl.className = '';
+      setTimeout(connectWS, 3000);
+    }
+  }
+
+  // ── Event Router ──────────────────────────────────
+  function handleEvent(data) {
+    switch(data.type) {
+      case 'NEW_FINDING':     addAlertCard(data);                              break;
+      case 'THREAT_SCORE':    updateScore(data.score);                         break;
+      case 'SCAN_STATUS':     updateScanStatus(data.message);                  break;
+      case 'ATTACK_DETECTED': onAttackDetected(data);                          break;
+      case 'PLAYBOOK_READY':  onPlaybookReady(data);                           break;
+      case 'TOPOLOGY_UPDATE': renderTopology(data.nodes, data.edges);          break;
+    }
+  }
+
+  // ── Alert Feed ────────────────────────────────────
+  function addAlertCard(data) {
+    var feed = document.getElementById('alert-feed');
+    var sev  = (data.severity || 'low').toLowerCase();
+    var card = document.createElement('div');
+    card.className = 'alert-card ' + sev;
+    card.innerHTML =
+      '<div class="sev" style="color:var(--' + (sev === 'critical' ? 'critical' : sev === 'high' ? 'red' : sev === 'medium' ? 'orange' : 'muted') + ')">' + sev.toUpperCase() + '</div>' +
+      '<div class="msg">' + (data.message || data.title || 'Security event detected') + '</div>' +
+      '<div class="ts">' + new Date().toLocaleTimeString() + '</div>';
+    feed.prepend(card);
+    if (feed.children.length > 50) feed.removeChild(feed.lastChild);
+  }
+
+  // ── Threat Score ──────────────────────────────────
+  function updateScore(score) {
+    threatScore = score;
+    var el     = document.getElementById('score-value');
+    var status = document.getElementById('score-status');
+    el.textContent = score;
+    if (score >= 80) {
+      el.style.color     = 'var(--critical)';
+      status.textContent = '⚠ CRITICAL';
+      status.style.color = 'var(--critical)';
+    } else if (score >= 60) {
+      el.style.color     = 'var(--orange)';
+      status.textContent = '▲ WARNING';
+      status.style.color = 'var(--orange)';
+    } else if (score >= 40) {
+      el.style.color     = 'var(--yellow)';
+      status.textContent = '● ELEVATED';
+      status.style.color = 'var(--yellow)';
+    } else {
+      el.style.color     = 'var(--green)';
+      status.textContent = '✓ SECURE';
+      status.style.color = 'var(--green)';
+    }
+  }
+
+  // ── Scan Status ───────────────────────────────────
+  function updateScanStatus(msg) {
+    document.getElementById('scan-status').textContent = 'Status: ' + msg;
+  }
+
+  // ── Attack Detected ───────────────────────────────
+  function onAttackDetected(data) {
+    addAlertCard({ severity: 'critical', message: '⚠ ATTACK DETECTED: ' + (data.attack_type || 'Unknown') });
+    document.getElementById('attack-path').innerHTML = '<div style="color:var(--red);font-size:12px;font-weight:700;margin-bottom:8px">ATTACK IN PROGRESS</div>';
+    if (data.steps) {
+      data.steps.forEach(function(s) {
+        var div = document.createElement('div');
+        div.className = 'ap-step';
+        div.innerHTML = '<div class="ap-num">' + s.step + '</div><div><div class="ap-text">' + s.action + '</div><div class="ap-tactic">' + (s.tactic || '') + '</div></div>';
+        document.getElementById('attack-path').appendChild(div);
+      });
+    }
+  }
+
+  // ── Playbook Ready ────────────────────────────────
+  function onPlaybookReady(data) {
+    currentPlaybookId = data.playbook_id;
+    var steps = document.getElementById('playbook-steps');
+    steps.innerHTML = '';
+    if (data.steps) {
+      data.steps.forEach(function(s) {
+        var div = document.createElement('div');
+        div.style.cssText = 'font-size:11px;padding:6px 0;border-bottom:1px solid var(--border);';
+        div.innerHTML = '<span style="color:var(--accent);font-weight:700">' + s.step + '.</span> ' + s.action + ' <span style="color:var(--muted)">[' + s.team + ']</span>';
+        steps.appendChild(div);
+      });
+    }
+    document.getElementById('approve-btn').style.display = 'block';
+  }
+
+  // ── Network Topology ──────────────────────────────
+  var cy = null;
+  function initTopology() {
+    cy = cytoscape({
+      container: document.getElementById('cy'),
+      style: [
+        { selector: 'node', style: {
+            'background-color': '#1C2128',
+            'border-color': '#30363D',
+            'border-width': 2,
+            'label': 'data(label)',
+            'color': '#E6EDF3',
+            'font-size': '11px',
+            'text-valign': 'bottom',
+            'text-margin-y': 6,
+            'width': 40, 'height': 40
+        }},
+        { selector: 'node.internet', style: { 'background-color': '#0EA5E9', 'border-color': '#0EA5E9' }},
+        { selector: 'node.attacked', style: { 'background-color': '#F85149', 'border-color': '#FF0000', 'border-width': 3 }},
+        { selector: 'node.remediated', style: { 'background-color': '#3FB950', 'border-color': '#3FB950' }},
+        { selector: 'node.warning', style: { 'background-color': '#D29922', 'border-color': '#D29922' }},
+        { selector: 'edge', style: {
+            'line-color': '#30363D',
+            'target-arrow-color': '#30363D',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'width': 2
+        }},
+        { selector: 'edge.attack-path', style: {
+            'line-color': '#F85149',
+            'target-arrow-color': '#F85149',
+            'width': 3,
+            'line-style': 'dashed'
+        }},
+        { selector: 'edge.remediated', style: {
+            'line-color': '#3FB950',
+            'target-arrow-color': '#3FB950'
+        }}
+      ],
+      layout: { name: 'preset' },
+      userZoomingEnabled: true,
+      userPanningEnabled: true
+    });
+  }
+
+  function renderTopology(nodes, edges) {
+    if (!cy) return;
+    cy.elements().remove();
+    var cyNodes = nodes.map(function(n, i) {
+      return { data: { id: n.id, label: n.name || n.id },
+               classes: n.type || '',
+               position: { x: 120 + (i * 160), y: n.type === 'internet' ? 60 : n.type === 'database' ? 280 : 170 }};
+    });
+    var cyEdges = edges.map(function(e) {
+      return { data: { id: e.from + '-' + e.to, source: e.from, target: e.to }};
+    });
+    cy.add(cyNodes.concat(cyEdges));
+    cy.fit(cy.elements(), 40);
+  }
+
+  function markAttackPath(nodeIds, edgeIds) {
+    if (!cy) return;
+    nodeIds.forEach(function(id) { cy.$('#' + id).addClass('attacked'); });
+    edgeIds.forEach(function(id) { cy.$('#' + id).addClass('attack-path'); });
+  }
+
+  function markRemediated() {
+    if (!cy) return;
+    cy.nodes('.attacked').removeClass('attacked').addClass('remediated');
+    cy.edges('.attack-path').removeClass('attack-path').addClass('remediated');
+  }
+
+  function loadTopology() {
+    fetch(API_BASE + '/api/topology')
+      .then(function(r) { return r.json(); })
+      .then(function(d) { renderTopology(d.nodes || [], d.edges || []); })
+      .catch(function() { console.log('Topology not available yet'); });
+  }
+
+  // ── Approve Remediation ───────────────────────────
+  function approveRemediation() {
+    if (!currentPlaybookId) return;
+    var btn = document.getElementById('approve-btn');
+    btn.textContent = 'DEPLOYING...';
+    btn.style.background = 'var(--orange)';
+    btn.disabled = true;
+    // For demo mode — simulate deployment locally
+    if (currentPlaybookId === 'PB-DEMO-001') {
+      setTimeout(function() {
+        btn.textContent = '✓ REMEDIATION DEPLOYED';
+        btn.style.background = 'var(--green)';
+        btn.style.animation = 'none';
+        markRemediated();
+        addAlertCard({ severity: 'low', message: '✓ Remediation deployed — system securing' });
+      }, 1500);
+      return;
+    }
+    fetch(API_BASE + '/api/approve/' + currentPlaybookId, { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function() {
+        btn.textContent = '✓ REMEDIATION DEPLOYED';
+        btn.style.background = 'var(--green)';
+        btn.style.animation = 'none';
+        markRemediated();
+        addAlertCard({ severity: 'low', message: '✓ Remediation deployed — system securing' });
+      })
+      .catch(function() {
+        btn.textContent = 'APPROVE REMEDIATION';
+        btn.disabled = false;
+      });
+  }
+
+  // ── Scan Trigger ──────────────────────────────────
+  function triggerScan(type) {
+    if (type === 'simulate') {
+      runDemoSequence();
+      return;
+    }
+    updateScanStatus('Running ' + type + ' scan...');
+    var btns = document.querySelectorAll('.scan-btn');
+    btns.forEach(function(b) { b.disabled = true; });
+    fetch(API_BASE + '/api/scan/' + type, { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) { updateScanStatus(d.message || 'Scan started'); })
+      .catch(function() { updateScanStatus('Scan endpoint not reachable'); })
+      .finally(function() { btns.forEach(function(b) { b.disabled = false; }); });
+  }
+
+  // ── AI Chat ───────────────────────────────────────
+  function sendChat() {
+    var input = document.getElementById('chat-input');
+    var msgs  = document.getElementById('chat-messages');
+    var text  = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    // Show user message
+    var userMsg = document.createElement('div');
+    userMsg.className = 'chat-msg user';
+    userMsg.textContent = text;
+    msgs.appendChild(userMsg);
+    // Show typing indicator
+    var typing = document.createElement('div');
+    typing.className = 'chat-msg ai';
+    typing.id = 'typing-indicator';
+    typing.innerHTML = '<span style="color:var(--muted)">AI is thinking...</span>';
+    msgs.appendChild(typing);
+    msgs.scrollTop = msgs.scrollHeight;
+    // Send to API
+    fetch(API_BASE + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var typingEl = document.getElementById('typing-indicator');
+      if (typingEl) typingEl.remove();
+      var aiMsg = document.createElement('div');
+      aiMsg.className = 'chat-msg ai';
+      aiMsg.textContent = d.response || d.message || 'No response';
+      msgs.appendChild(aiMsg);
+      msgs.scrollTop = msgs.scrollHeight;
+    })
+    .catch(function() {
+      var typingEl = document.getElementById('typing-indicator');
+      if (typingEl) typingEl.textContent = 'Chat API not available';
+    });
+  }
+
+  // Add a welcome message on load
+  (function() {
+    var msgs = document.getElementById('chat-messages');
+    var msg  = document.createElement('div');
+    msg.className = 'chat-msg ai';
+    msg.textContent = 'Security AI online. Ask me about threats, vulnerabilities, or incidents.';
+    msgs.appendChild(msg);
+  })();
+
+  // ── Demo Mode ─────────────────────────────────────
+  // Call runDemoSequence() to simulate full attack without backend
+  function runDemoSequence() {
+    // Step 1: Load mock topology
+    renderTopology(
+      [
+        { id: 'internet',   name: 'Internet',               type: 'internet' },
+        { id: 'web-server', name: 'Web Server\n10.0.0.5' },
+        { id: 'app-server', name: 'App Server\n10.0.0.8' },
+        { id: 'database',   name: 'Database\n10.0.0.10',    type: 'database' }
+      ],
+      [
+        { from: 'internet',   to: 'web-server' },
+        { from: 'web-server', to: 'app-server' },
+        { from: 'app-server', to: 'database'   }
+      ]
+    );
+    updateScore(23);
+    updateScanStatus('Scan completed — findings loaded');
+
+    // Step 2: Add some findings after 1s
+    setTimeout(function() {
+      addAlertCard({ severity: 'high',   message: 'SQL Injection detected on /login endpoint' });
+      addAlertCard({ severity: 'high',   message: 'Port 3306 exposed to internet on 10.0.0.10' });
+      addAlertCard({ severity: 'medium', message: 'SSH brute force: 45 attempts from 45.33.22.11' });
+      updateScore(61);
+    }, 1000);
+
+    // Step 3: Simulate attack after 3s
+    setTimeout(function() {
+      addAlertCard({ severity: 'critical', message: '⚠ ATTACK DETECTED — SQL Injection active on /login' });
+      updateScore(89);
+      markAttackPath(
+        ['internet', 'web-server', 'app-server', 'database'],
+        ['internet-web-server', 'web-server-app-server', 'app-server-database']
+      );
+      onAttackDetected({
+        attack_type: 'SQL Injection → Database Exfiltration',
+        steps: [
+          { step: 1, action: 'SQL Injection on /login endpoint', tactic: 'Initial Access — T1190' },
+          { step: 2, action: 'Database credential extraction',   tactic: 'Credential Access — T1552' },
+          { step: 3, action: 'Customer table data exfiltration', tactic: 'Exfiltration — T1041' }
+        ]
+      });
+    }, 3000);
+
+    // Step 4: Show playbook after 5s
+    setTimeout(function() {
+      currentPlaybookId = 'PB-DEMO-001';
+      onPlaybookReady({
+        playbook_id: 'PB-DEMO-001',
+        steps: [
+          { step: 1, action: 'Block attacker IP 45.33.22.11 at firewall',       team: 'ops'      },
+          { step: 2, action: 'Enable WAF rule — SQL injection filter #442',     team: 'security' },
+          { step: 3, action: 'Preserve database audit logs for forensics',      team: 'forensics'},
+          { step: 4, action: 'Notify legal team — GDPR assessment required',    team: 'legal'    },
+          { step: 5, action: 'Replace raw SQL with prepared statements',        team: 'dev'      }
+        ]
+      });
+      addAlertCard({ severity: 'low', message: '✓ AI playbook generated — awaiting approval' });
+    }, 5000);
+  }
+
+  // ── Initialise ────────────────────────────────────
+  connectWS();
+  initTopology();
+  loadTopology();
+  updateScore(0);
+
+  // Auto-run demo if backend not available after 5 seconds
+  // Remove this block once the real backend is running
+  setTimeout(function() {
+    if (document.getElementById('connection-status').textContent !== '● CONNECTED') {
+      console.log('Backend not available — loading demo data');
+      runDemoSequence();
+    }
+  }, 5000);
+</script>
+
+</body>
+</html>
